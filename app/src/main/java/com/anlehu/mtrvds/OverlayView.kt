@@ -1,5 +1,5 @@
 package com.anlehu.mtrvds
 
-class Classifier {
+class OverlayView {
 
 }
