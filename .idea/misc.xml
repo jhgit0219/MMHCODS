@@ -3,7 +3,11 @@
   <component name="DesignSurface">
     <option name="filePathToZoomLevelMap">
       <map>
+        <entry key="..\:/Users/Jet/MMHCODS_APP/app/src/main/res/layout/camera_detection_activity.xml" value="0.20520833333333333" />
+        <entry key="..\:/Users/Jet/MMHCODS_APP/app/src/main/res/layout/fragment_camera.xml" value="0.20520833333333333" />
         <entry key="..\:/Users/Jet/MTTVRDS_APP/app/src/main/res/layout/activity_main.xml" value="0.19479166666666667" />
+        <entry key="..\:/Users/Jet/MTTVRDS_APP/app/src/main/res/layout/camera_detection_activity.xml" value="0.20520833333333333" />
+        <entry key="..\:/Users/Jet/MTTVRDS_APP/app/src/main/res/layout/fragment_camera.xml" value="0.22" />
       </map>
     </option>
   </component>
