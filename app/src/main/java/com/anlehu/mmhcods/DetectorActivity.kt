@@ -1,5 +1,6 @@
 package com.anlehu.mmhcods
 
+import android.content.ContentValues
 import android.graphics.*
 import android.media.ImageReader
 import android.os.Build
@@ -11,16 +12,16 @@ import android.view.Surface
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import com.anlehu.mmhcods.utils.BorderedText
-import com.anlehu.mmhcods.utils.Detector.*
+import com.anlehu.mmhcods.utils.DbHelper
+import com.anlehu.mmhcods.utils.DbHelper.ViolationEntry
+import com.anlehu.mmhcods.utils.Detector.Detection
 import com.anlehu.mmhcods.utils.DetectorFactory
 import com.anlehu.mmhcods.utils.ImageUtils
 import com.anlehu.mmhcods.views.OverlayView
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
-import java.lang.Exception
 import java.util.*
-import java.util.concurrent.Semaphore
 import kotlin.collections.ArrayList
 
 class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
@@ -31,7 +32,6 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
     private lateinit var borderedText: BorderedText
     private lateinit var tracker: BoxTracker
     private lateinit var detector: YoloV5Classifier
-    private val procVioLock = Semaphore(1)
 
     private val liveModel = DataViewModel()
     private lateinit var finViolationObserver: androidx.lifecycle.Observer<MutableList<MotorcycleObject>>
@@ -49,6 +49,8 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
 
     private var MAINTAIN_ASPECT = true
     val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    private val dbHelper = DbHelper(this)
+    private val db = dbHelper.writableDatabase
 
     override fun getLayoutId(): Int {
         return R.layout.fragment_camera
@@ -57,11 +59,12 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
     override fun getDesiredPreviewFrameSize(): Size {
         return DESIRED_PREVIEW_SIZE
     }
+    @RequiresApi(Build.VERSION_CODES.N)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         liveModel.finalViolationsList.observe(this, { list->
             Log.d("SIZE_LIST", list.size.toString())
-            //sendData
+            saveDataToDb()
         })
     }
     override fun onPreviewSizeChosen(size: Size, rotation: Int) {
@@ -110,6 +113,24 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
         )
 
         tracker.setFrameConfig(previewWidth, previewHeight, sensorOrientation)
+    }
+
+    @RequiresApi(Build.VERSION_CODES.N)
+    @Synchronized
+    fun saveDataToDb(){
+        val violationList = liveModel.getFinalViolationsList()!!
+        for(violation in violationList){
+            val values = ContentValues().apply{
+                put(ViolationEntry.COL_TIMESTAMP, Calendar.getInstance().time.toString())
+                put(ViolationEntry.COL_LOC, "Lapu-Lapu City")
+                put(ViolationEntry.COL_SNAPSHOT, "thislocation")
+                put(ViolationEntry.COL_OFFENSE, violation.offense)
+                put(ViolationEntry.COL_LP, if(violation.licensePlate != null) violation.licensePlate!!.licenseNumber else "")
+            }
+            val newRowId = db.insert(ViolationEntry.TABLE_NAME, null, values)
+            Log.d("DATABASE_OP", "Inserted $newRowId")
+            liveModel.removeFromFinalViolationsList(violation)
+        }
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
@@ -183,7 +204,6 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
          *      Maybe add a license plate checker on the next frame to reconfirm if this object really does not have
          *      a helmet.
          */
-        procVioLock.acquire()
         try{
             var motorcycleList: MutableList<MotorcycleObject> = ArrayList()
             var helmetList: MutableList<Detection> = ArrayList()
@@ -219,7 +239,8 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
              */
             for(motorcycle in motorcycleList){
                 var isTricycle = false
-                // Check if motorcycle is bound within a tricycle box
+                // Check if motorcycle is bound within a tricycle box. The requirements are the motorcycle must be
+                // Within the rects of half of the left side of the tricycle. Otherwise, it's most likely a tricycle.
                 for(tricycle in tricycleList){
                     if(motorcycle.motorcyclist!!.location.intersects(
                             tricycle.location.left,
@@ -287,6 +308,12 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
                             break
                         }
                     }
+                    // If none of the current lps' intersect with a previous potential violator, remove it from
+                    // The list.
+                    if(!potAddedToFinal){
+                        liveModel.removeFromPotentialViolationsList(potViolator)
+                        Log.d("NO_VIOL", "No violators detected within current frame")
+                    }
                 }
 
                 /**
@@ -296,15 +323,13 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
                 if(motorcycle.helmet == null && !motorcycle.potentialViolation && !motorcycle.finalViolation){
                     Log.d("MOTOR_DETECTED", "HELMET NOT FOUND, PLACING IN POTENTIAL")
                     motorcycle.potentialViolation = true
+                    motorcycle.offense = "no helmet"
                     liveModel.addToPotentialViolationsList(motorcycle)
                 }
             }
         }catch(e: Exception){
             e.printStackTrace()
-        }finally{
-            procVioLock.release()
         }
-
     }
 
     /**
@@ -373,6 +398,7 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
                 val resultTexts = it.textBlocks
                 for(text in resultTexts){
                     val replace = text.text.replace("\\s".toRegex(), "")
+                    // Valid Philippine License Plate Numbers length, both Temporary and Permanent
                     if(replace.length == 6 || replace.length == 7 || replace.length == 11 || replace.length == 12 ){
                         motorcycleObject.licensePlate!!.licenseNumber = text.text
                     }
@@ -415,6 +441,7 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
         var licensePlate: LicensePlate? = null
         var potentialViolation: Boolean = false
         var finalViolation: Boolean = false
+        var offense: String = ""
 
         // Pass license plate recognition to a separate reader. Maintain id as identifier for which motorcycle owns which
         // license plate

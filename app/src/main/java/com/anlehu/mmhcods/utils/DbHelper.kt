@@ -7,8 +7,7 @@ import android.provider.BaseColumns
 
 class DbHelper(context: Context): SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
 
-
-    object violationEntry : BaseColumns{
+    object ViolationEntry : BaseColumns{
         const val TABLE_NAME = "violations_table"
         const val COL_TIMESTAMP = "timestamp"
         const val COL_LOC = "location"
@@ -16,18 +15,6 @@ class DbHelper(context: Context): SQLiteOpenHelper(context, DATABASE_NAME, null,
         const val COL_OFFENSE = "offense"
         const val COL_LP = "license_plate"
     }
-
-    private val SQL_CREATE_ENTRIES =
-        "CREATE TABLE ${violationEntry.TABLE_NAME} ("+
-                "${BaseColumns._ID} INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"+
-                "${violationEntry.COL_TIMESTAMP} TEXT,"+
-                "${violationEntry.COL_LOC} TEXT,"+
-                "${violationEntry.COL_SNAPSHOT} TEXT,"+
-                "${violationEntry.COL_OFFENSE} TEXT,"+
-                "${violationEntry.COL_LP} TEXT)"
-
-    private val SQL_DELETE_ENTRIES = "DROP TABLE IF EXISTS ${violationEntry.TABLE_NAME}"
-
 
     override fun onCreate(db: SQLiteDatabase?) {
         db!!.execSQL(SQL_CREATE_ENTRIES)
@@ -43,7 +30,20 @@ class DbHelper(context: Context): SQLiteOpenHelper(context, DATABASE_NAME, null,
     }
 
     companion object{
+        private const val SQL_CREATE_ENTRIES =
+            "CREATE TABLE ${ViolationEntry.TABLE_NAME} ("+
+                    "${BaseColumns._ID} INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"+
+                    "${ViolationEntry.COL_TIMESTAMP} TEXT,"+
+                    "${ViolationEntry.COL_LOC} TEXT,"+
+                    "${ViolationEntry.COL_SNAPSHOT} TEXT,"+
+                    "${ViolationEntry.COL_OFFENSE} TEXT,"+
+                    "${ViolationEntry.COL_LP} TEXT)"
+
+        private const val SQL_DELETE_ENTRIES = "DROP TABLE IF EXISTS ${ViolationEntry.TABLE_NAME}"
+
         const val DATABASE_VERSION = 1
         const val DATABASE_NAME = "Violations.db"
+
+
     }
 }
