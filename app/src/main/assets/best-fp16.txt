@@ -1,3 +1,0 @@
-helmet
-motorcyclist
-license_plate

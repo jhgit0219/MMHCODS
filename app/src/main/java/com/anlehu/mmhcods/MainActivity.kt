@@ -83,10 +83,9 @@ class MainActivity : AppCompatActivity() {
 
     companion object{
         var MINIMUM_CONFIDENCE = 0.4f
-        var INPUT_SIZE = 640
         var IS_QUANTIZED = false
-        var MAIN_MODEL_NAME: String = "best-fp16.tflite"
-        var MAIN_LABELS_NAME: String = "file:///android_asset/best-fp16.txt"
+        var MAIN_MODEL_NAME: String = "main_detector.tflite"
+        var MAIN_LABELS_NAME: String = "file:///android_asset/main_labels.txt"
 
         var MAINTAIN_ASPECT = true
 

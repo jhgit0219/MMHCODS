@@ -8,16 +8,20 @@ import android.util.Log
 import android.util.Size
 import android.util.TypedValue
 import android.view.Surface
-import android.view.WindowManager
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import com.anlehu.mmhcods.utils.BorderedText
-import com.anlehu.mmhcods.utils.Detector
+import com.anlehu.mmhcods.utils.Detector.*
 import com.anlehu.mmhcods.utils.DetectorFactory
 import com.anlehu.mmhcods.utils.ImageUtils
 import com.anlehu.mmhcods.views.OverlayView
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.lang.Exception
 import java.util.*
+import java.util.concurrent.Semaphore
+import kotlin.collections.ArrayList
 
 class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
 
@@ -27,6 +31,10 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
     private lateinit var borderedText: BorderedText
     private lateinit var tracker: BoxTracker
     private lateinit var detector: YoloV5Classifier
+    private val procVioLock = Semaphore(1)
+
+    private val liveModel = DataViewModel()
+    private lateinit var finViolationObserver: androidx.lifecycle.Observer<MutableList<MotorcycleObject>>
 
     private var sensorOrientation: Int = 0
     private var previewWidth = 0
@@ -37,9 +45,10 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
     private var croppedBitmap: Bitmap? = null
     private var copiedBitmap: Bitmap? = null
 
-    private var DESIRED_PREVIEW_SIZE = Size(640, 640)
+    private var DESIRED_PREVIEW_SIZE = Size(1920, 1080)
 
     private var MAINTAIN_ASPECT = true
+    val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
     override fun getLayoutId(): Int {
         return R.layout.fragment_camera
@@ -50,6 +59,10 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        liveModel.finalViolationsList.observe(this, { list->
+            Log.d("SIZE_LIST", list.size.toString())
+            //sendData
+        })
     }
     override fun onPreviewSizeChosen(size: Size, rotation: Int) {
 
@@ -72,7 +85,7 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
 
         previewWidth = size.width
         previewHeight = size.height
-
+        Log.d("ORIENTATION:", "$rotation AND ${getScreenOrientation()}")
         sensorOrientation = rotation - getScreenOrientation()
 
         Log.d("CAM_SIZE", "Initializing at $previewWidth x $previewHeight")
@@ -116,10 +129,10 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
         val canvas = Canvas(croppedBitmap!!)
         canvas.drawBitmap(rgbFrameBitmap!!, frameToCropMat, null)
 
-        //ImageUtils.saveBitmap(croppedBitmap!!, "preview.png")
+        //ImageUtils.saveBitmap(rgbFrameBitmap!!, "preview.png")
 
         runInBackground {
-            val results: List<Detector.Detection> = detector.detectImage(croppedBitmap!!)
+            val results: List<Detection> = detector.detectImage(croppedBitmap!!)
             copiedBitmap = Bitmap.createBitmap(croppedBitmap!!)
             val canvas1 = Canvas(copiedBitmap!!)
             val paint = Paint()
@@ -129,7 +142,7 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
 
             val minConfidence = MainActivity.MINIMUM_CONFIDENCE
 
-            var mappedPredictions: MutableList<Detector.Detection> = LinkedList()
+            var mappedPredictions: MutableList<Detection> = LinkedList()
 
             for (result in results) {
                 val location: RectF = result.location
@@ -146,19 +159,21 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
             tracker.trackResults(mappedPredictions, 0)
             trackingOverlay.postInvalidate()
 
-            populateFrameDetections(mappedPredictions)
+            // Detect Violations
+            detectViolations(mappedPredictions)
 
             computingDetection = false
         }
     }
 
-    private fun populateFrameDetections(results: MutableList<Detector.Detection>) {
+    @RequiresApi(Build.VERSION_CODES.N)
+    private fun detectViolations(results: MutableList<Detection>) {
         /** Logic will be:
          * 1.) for result in results
          * 2.) if object is class motorcylist(0), create new object predictedMotorcyclist
          * 3.) since results is ordered by 0, 0, 1, 1, 2, 2, etc... then we can assume that the number of motorcyclist
          *      is what we are concerned with.
-         * 4.) if object is class 1, create new helmetList and add this object
+         * 4.) if object is class 1, create new helmetList and add this object with the same id
          * 5.) if object is class 2, create new license plate and add this object
          * 6.) Check each of their rects: If helmet rect is within motorcycle rect, add it to that predictedMotorycle
          *      object. Same with license plate
@@ -168,6 +183,205 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
          *      Maybe add a license plate checker on the next frame to reconfirm if this object really does not have
          *      a helmet.
          */
+        procVioLock.acquire()
+        try{
+            var motorcycleList: MutableList<MotorcycleObject> = ArrayList()
+            var helmetList: MutableList<Detection> = ArrayList()
+            var lpList: MutableList<Detection> = ArrayList()
+            var tricycleList: MutableList<Detection> = ArrayList()
+
+            var index = 0
+            var helmetIndex = 0
+            var lpIndex = 0
+            for(result in results){
+                if(result.detectedClass == 0){
+                    val motorcycleObject = MotorcycleObject()
+                    result.id = index++.toString()
+                    motorcycleObject.motorcyclist = result
+                    motorcycleList.add(motorcycleObject)
+                    Log.d("MOTOR_DETECTED:", motorcycleList.size.toString())
+                }
+
+                if(result.detectedClass == 1){
+                    //result.id = helmetIndex++.toString()
+                    helmetList.add(result)
+                }
+                if(result.detectedClass == 2){
+                    //result.id = lpIndex++.toString()
+                    lpList.add(result)
+                }
+                if(result.detectedClass == 3){
+                    tricycleList.add(result)
+                }
+            }
+            /**
+             * Check each motorcycle for the location rect, and see if any helmet or lp is within this rectangle.
+             */
+            for(motorcycle in motorcycleList){
+                var isTricycle = false
+                // Check if motorcycle is bound within a tricycle box
+                for(tricycle in tricycleList){
+                    if(motorcycle.motorcyclist!!.location.intersects(
+                            tricycle.location.left,
+                            tricycle.location.top,
+                            tricycle.location.right,
+                            tricycle.location.bottom
+                        )){
+                        isTricycle = true
+                        break
+                    }
+                }
+                if(isTricycle){
+                    Log.d("TRICYCLE", "Detection is a Tricycle")
+                    //Skip everything below if isTricycle
+                    continue
+                }else{
+                    Log.d("TRICYCLE", "Detection is not a tricycle")
+                }
+                for(helmet in helmetList){
+                    if(helmet.location.intersects(
+                            motorcycle.motorcyclist!!.location.left,
+                            motorcycle.motorcyclist!!.location.top,
+                            motorcycle.motorcyclist!!.location.right,
+                            motorcycle.motorcyclist!!.location.bottom)){
+
+                        motorcycle.helmet = helmet
+                        break
+                    }
+                }
+                for(lp in lpList){
+                    if(lp.location.intersects(
+                            motorcycle.motorcyclist!!.location.left,
+                            motorcycle.motorcyclist!!.location.top,
+                            motorcycle.motorcyclist!!.location.right,
+                            motorcycle.motorcyclist!!.location.bottom)) {
+
+                        motorcycle.licensePlate = LicensePlate(lp)
+                        motorcycle.snapshot = rgbFrameBitmap!!
+                        readLp(motorcycle)
+                        break
+                    }
+                }
+                /**
+                 * Check current potential violations list. If there is any, process the violations list.
+                 */
+                val originalPotentialViolationsList = liveModel.getPotentialViolationsList()
+                for(potViolator in originalPotentialViolationsList!!){
+                    var potAddedToFinal = false
+                    for(lp in lpList){
+                        /**
+                         * TEMPORARY
+                         */
+                        // IF THIS IS TRUE, THEN CONFIRM THE VIOLATION
+                        if(potViolator.potentialViolation && lp.location.intersects(
+                                potViolator.motorcyclist!!.location.left,
+                                potViolator.motorcyclist!!.location.top,
+                                potViolator.motorcyclist!!.location.right,
+                                potViolator.motorcyclist!!.location.bottom)) {
+                            // Remove from potential violations list
+                            liveModel.removeFromPotentialViolationsList(potViolator)
+                            // Call and prepare to save data in device or send over the network
+                            processViolation(potViolator)
+                            Log.d("MOTOR_DETECTED", "NO HELMET FINAL VERDICT")
+                            potAddedToFinal = true
+                            break
+                        }
+                    }
+                }
+
+                /**
+                 * Place motorcycle into potential violation. Next Frame, check if existing license plate is within potential
+                 * violation list.
+                 */
+                if(motorcycle.helmet == null && !motorcycle.potentialViolation && !motorcycle.finalViolation){
+                    Log.d("MOTOR_DETECTED", "HELMET NOT FOUND, PLACING IN POTENTIAL")
+                    motorcycle.potentialViolation = true
+                    liveModel.addToPotentialViolationsList(motorcycle)
+                }
+            }
+        }catch(e: Exception){
+            e.printStackTrace()
+        }finally{
+            procVioLock.release()
+        }
+
+    }
+
+    /**
+     * Process the final violations list. Save it into device, preparing for upload
+     */
+
+    private fun processViolation(potViolator: DetectorActivity.MotorcycleObject) {
+        if(potViolator.licensePlate != null){
+            Runnable{
+                readLp(potViolator)
+                if(!liveModel.getReportedList()!!.contains(potViolator.licensePlate!!.licenseNumber)){
+                    Log.d("PROC_VIOL", "ADDING LICENSE" )
+                    liveModel.addToReportedList(potViolator.licensePlate!!.licenseNumber)
+                    liveModel.addToFinalViolationsList(potViolator)
+                }else{
+                    Log.d("PROC_VIOL", "LICENSE ALREADY PREPARED FOR REPORT" )
+                }
+            }.run()
+            /**
+             * 1.) SAVE DATA TO DEVICE. PREPARE TO UPLOAD OVER THE NETWORK
+             * 1.) ADD CHECKER FOR NETWORK CONFIG. IF NETWORK WORKS
+             */
+        }else{
+            Log.d("PROC_VIOL", "No LP detected")
+        }
+
+    }
+    /**
+     * Checker for LP
+     */
+    @Synchronized
+    fun readLp(motorcycleObject: MotorcycleObject){
+        val licensePlate = motorcycleObject.licensePlate!!.detectedLicense
+        /**
+         * Get the original bitmap rgbFrameBitmap, then use RectF to crop bitmap. Save bitmap after.
+         */
+        var croppedLicensePlate = Bitmap.createBitmap(licensePlate.location.width().toInt(),
+            licensePlate.location.height().toInt(), Bitmap.Config.ARGB_8888)
+
+        //Create new canvas
+        val canvas = Canvas(croppedLicensePlate)
+
+        //Draw the background
+        val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+        paint.color = Color.WHITE
+        canvas.drawRect(
+            Rect(0,
+                0,
+                licensePlate.location.width().toInt(),
+                licensePlate.location.height().toInt()),
+            paint)
+
+        val matrix = Matrix()
+        matrix.postTranslate(-licensePlate.location.left, -licensePlate.location.top)
+        //canvas.save()
+        //canvas.rotate(90f)
+        canvas.drawBitmap(motorcycleObject.snapshot!!, matrix, paint)
+        //canvas.restore()
+       // matrix.postRotate(90f)
+       // croppedLicensePlate = Bitmap.createBitmap(croppedLicensePlate, 0, 0, croppedLicensePlate.width, croppedLicensePlate.height, matrix, true )
+        //ImageUtils.saveBitmap(croppedLicensePlate, "lp.png")
+
+        // USE ML KIT TEXT RECOGNIZER
+        val result = recognizer.process(InputImage.fromBitmap(croppedLicensePlate, 90))
+            .addOnSuccessListener {
+                val resultTexts = it.textBlocks
+                for(text in resultTexts){
+                    val replace = text.text.replace("\\s".toRegex(), "")
+                    if(replace.length == 6 || replace.length == 7 || replace.length == 11 || replace.length == 12 ){
+                        motorcycleObject.licensePlate!!.licenseNumber = text.text
+                    }
+                }
+            }
+            .addOnFailureListener {e->
+                Log.d("LP_READ", e.toString())
+            }
+
     }
 
     private fun getScreenOrientation(): Int{
@@ -194,12 +408,26 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
         const val TEXT_SIZE_DIP = 10.0f
     }
 
-    class MotorcycleObject(){
-        var id: Int? = null
-        var helmetState: Boolean = false
-        var licensePlate: RectF? = null
+    class MotorcycleObject {
+        var snapshot: Bitmap? = null
+        var motorcyclist: Detection? = null
+        var helmet: Detection? = null
+        var licensePlate: LicensePlate? = null
+        var potentialViolation: Boolean = false
+        var finalViolation: Boolean = false
 
         // Pass license plate recognition to a separate reader. Maintain id as identifier for which motorcycle owns which
         // license plate
+    }
+
+    class LicensePlate {
+
+        var licenseNumber: String = ""
+        var detectedLicense = Detection()
+
+        constructor(detection: Detection){
+            detectedLicense = detection
+        }
+
     }
 }

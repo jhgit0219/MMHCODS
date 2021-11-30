@@ -23,6 +23,9 @@
         android:hardwareAccelerated="true"
         android:installLocation="internalOnly"
         android:theme="@style/Theme.MTTVRDS">
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="ocr" />
         <activity
             android:name="com.anlehu.mmhcods.MainActivity"
             android:exported="true">

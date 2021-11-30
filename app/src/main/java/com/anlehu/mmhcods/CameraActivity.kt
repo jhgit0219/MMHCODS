@@ -97,7 +97,7 @@ abstract class CameraActivity: AppCompatActivity(),
 
             processImage()
         }catch(e: Exception){
-            Log.e("CAM_ACT_ERROR: ", "Error occurred!")
+            Log.e("CAM_ACT_ERROR: ", e.toString())
             Trace.endSection()
             return
         }

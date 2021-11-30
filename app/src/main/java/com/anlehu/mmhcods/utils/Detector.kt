@@ -19,7 +19,7 @@ interface Detector {
      *  result returned by detector
      */
 
-    class Detection{
+    open class Detection{
         /**
          * Unique id for what has been detected
          */
@@ -42,12 +42,26 @@ interface Detector {
 
         var detectedClass: Int = -1
 
+        constructor(): super(){
+            id = ""
+            title = ""
+            confidence = 0f
+            location = RectF()
+        }
+
+        constructor(detection: Detection): super(){
+            this.id = detection.id
+            this.title = detection.title
+            this.confidence = detection.confidence
+            this.location = detection.location
+        }
+
         constructor(
             id: String,
             title: String,
             confidence: Float,
             location: RectF
-        ){
+        ): super(){
             this.id = id
             this.title = title
             this.confidence = confidence
@@ -60,7 +74,7 @@ interface Detector {
             confidence: Float,
             location: RectF,
             detectedClass: Int
-        ){
+        ):super(){
             this.id = id
             this.title = title
             this.confidence = confidence

@@ -63,7 +63,7 @@ class ImageUtils {
         }
 
         fun saveBitmap(bitmap: Bitmap, filename: String) {
-            val root = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).absolutePath
+            val root = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM).absolutePath
             Log.i("Saving bitmap to", "${bitmap.width}, ${bitmap.height}, $root")
             val myDir = File(root)
             if (!myDir.mkdirs()) {
@@ -75,7 +75,7 @@ class ImageUtils {
             }
             try {
                 val out = FileOutputStream(file)
-                bitmap.compress(Bitmap.CompressFormat.PNG, 99, out)
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
                 out.flush()
                 out.close()
             } catch (e: Exception) {

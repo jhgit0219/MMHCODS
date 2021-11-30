@@ -11,8 +11,8 @@ class DetectorFactory {
             var isQuantized: Boolean = false
             var inputSize = 0
 
-            if (modelFileName == "best-fp16.tflite") {
-                labelFileName = "file:///android_asset/best-fp16.txt"
+            if (modelFileName == "main_detector.tflite") {
+                labelFileName = "file:///android_asset/main_labels.txt"
                 isQuantized = false
                 inputSize = 640
             }
