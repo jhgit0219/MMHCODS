@@ -6,7 +6,6 @@ import android.content.pm.PackageManager
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.media.Image
-import android.media.Image.Plane
 import android.media.ImageReader
 import android.os.*
 import android.util.Log
@@ -16,7 +15,6 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import com.anlehu.mmhcods.utils.ImageUtils
-import java.lang.Exception
 
 abstract class CameraActivity: AppCompatActivity(),
     ImageReader.OnImageAvailableListener {
@@ -89,7 +87,7 @@ abstract class CameraActivity: AppCompatActivity(),
                     rgbBytes as IntArray
                 )
             }
-
+            // close image and set isProcessing frame to false
             postInferenceCallback = Runnable{
                 image.close()
                 isProcessingFrame = false

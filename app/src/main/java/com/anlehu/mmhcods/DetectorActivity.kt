@@ -1,6 +1,11 @@
+/************************************************************************************************************
+ * DetectorActivity - Activity that handles the image processing and detection features
+ ************************************************************************************************************/
+
 package com.anlehu.mmhcods
 
 import android.content.ContentValues
+import android.database.sqlite.SQLiteDatabase
 import android.graphics.*
 import android.media.ImageReader
 import android.os.Build
@@ -22,16 +27,18 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.util.*
-import kotlin.collections.ArrayList
 
 class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
 
     private lateinit var trackingOverlay: OverlayView
     private lateinit var frameToCropMat: Matrix
     private lateinit var cropToFrameMat: Matrix
+    private lateinit var frameToLaneMat: Matrix
+    private lateinit var laneToFrameMat: Matrix
     private lateinit var borderedText: BorderedText
     private lateinit var tracker: BoxTracker
     private lateinit var detector: YoloV5Classifier
+    private lateinit var laneDetector: LaneClassifier
 
     private val liveModel = DataViewModel()
     private lateinit var finViolationObserver: androidx.lifecycle.Observer<MutableList<MotorcycleObject>>
@@ -43,6 +50,7 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
 
     private var rgbFrameBitmap: Bitmap? = null
     private var croppedBitmap: Bitmap? = null
+    private var laneBitmap: Bitmap? = null
     private var copiedBitmap: Bitmap? = null
 
     private var DESIRED_PREVIEW_SIZE = Size(1920, 1080)
@@ -50,24 +58,55 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
     private var MAINTAIN_ASPECT = true
     val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     private val dbHelper = DbHelper(this)
-    private val db = dbHelper.writableDatabase
+    private lateinit var db: SQLiteDatabase
 
+    /********************************************************************************************************
+     * Gets layout id of the camera fragment
+     * @return Int ID value
+     ********************************************************************************************************/
     override fun getLayoutId(): Int {
         return R.layout.fragment_camera
     }
-
+    /********************************************************************************************************
+     * Gets the desired preview frame size
+     * @return Size value of desired preview size
+     ********************************************************************************************************/
     override fun getDesiredPreviewFrameSize(): Size {
         return DESIRED_PREVIEW_SIZE
     }
+    /********************************************************************************************************
+     * On create method
+     ********************************************************************************************************/
     @RequiresApi(Build.VERSION_CODES.N)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        createDatabase()
+    }
+    /********************************************************************************************************
+     * Create a local writable database that holds list of violations prepared to be uploaded to server
+     ********************************************************************************************************/
+    @RequiresApi(Build.VERSION_CODES.N)
+    private fun createDatabase(){
+        db = dbHelper.writableDatabase
         liveModel.finalViolationsList.observe(this, { list->
             Log.d("SIZE_LIST", list.size.toString())
             saveDataToDb()
         })
     }
+    /********************************************************************************************************
+     * Override onPreviewSizeChosen method; Creates detector objects used for object detection;
+     * Sets image templates and matrices with correct sizes to fit the detector requirements;
+     * Adds a callback to a drawing overlay canvas that draws boxes if any detection occurs
+     ********************************************************************************************************/
     override fun onPreviewSizeChosen(size: Size, rotation: Int) {
+
+        try{
+            detector = DetectorFactory.getDetector(assets, MainActivity.MAIN_MODEL_NAME)
+            laneDetector = DetectorFactory.getLaneDetector(assets, MainActivity.LANE_MODEL_NAME)
+        }catch(e: Exception){
+            Toast.makeText(this, "Classifier/s can't be initiated", Toast.LENGTH_SHORT).show()
+            finish()
+        }
 
         val textSizePx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, TEXT_SIZE_DIP, resources.displayMetrics)
         borderedText = BorderedText(textSizePx)
@@ -75,14 +114,9 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
 
         tracker = BoxTracker(this)
 
-        try{
-            detector = DetectorFactory.getDetector(assets, MainActivity.MAIN_MODEL_NAME)
-        }catch(e: Exception){
-            Toast.makeText(this, "Classifier can't be initiated", Toast.LENGTH_SHORT).show()
-            finish()
-        }
-
         val cropSize = detector.getInputSize()
+        val inputWidth = laneDetector.INPUT_WIDTH
+        val inputHeight = laneDetector.INPUT_HEIGHT
 
         Log.d("CROP_SIZE", "${detector.getInputSize()}")
 
@@ -94,13 +128,21 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
         Log.d("CAM_SIZE", "Initializing at $previewWidth x $previewHeight")
         rgbFrameBitmap = Bitmap.createBitmap(previewWidth, previewHeight, Bitmap.Config.ARGB_8888)
         croppedBitmap = Bitmap.createBitmap(cropSize, cropSize, Bitmap.Config.ARGB_8888)
+        laneBitmap = Bitmap.createBitmap(inputWidth, inputHeight, Bitmap.Config.ARGB_8888)
 
         frameToCropMat = ImageUtils.getTransformationMatrix(
             previewWidth, previewHeight, cropSize, cropSize, sensorOrientation, MAINTAIN_ASPECT
         )
 
+        frameToLaneMat = ImageUtils.getTransformationMatrix(
+            previewWidth, previewHeight, inputWidth, inputHeight, sensorOrientation, MAINTAIN_ASPECT
+        )
+
         cropToFrameMat = Matrix()
         frameToCropMat.invert(cropToFrameMat)
+
+        laneToFrameMat = Matrix()
+        frameToLaneMat.invert(laneToFrameMat)
 
         trackingOverlay = findViewById(R.id.tracking_overlay)
         trackingOverlay.addCallback(
@@ -114,6 +156,10 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
 
         tracker.setFrameConfig(previewWidth, previewHeight, sensorOrientation)
     }
+
+    /********************************************************************************************************
+     * Function that saves data to database
+     ********************************************************************************************************/
 
     @RequiresApi(Build.VERSION_CODES.N)
     @Synchronized
@@ -133,27 +179,37 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
         }
     }
 
+    /********************************************************************************************************
+     * Processes image for detection
+     ********************************************************************************************************/
+
     @RequiresApi(Build.VERSION_CODES.N)
     override fun processImage() {
-        trackingOverlay.postInvalidate()
 
-        if(computingDetection){
-            readyForNextImage()
-            return
+        trackingOverlay.postInvalidate()    // invalidate tracking overlay
+
+        if(computingDetection){             // if computingDetection is true
+            readyForNextImage()             // ready next image
+            return                          // return from function
         }
-        computingDetection = true
+        computingDetection = true           // set computingDetection to true
         Log.d("Processing Image", "$previewWidth x $previewHeight")
+        // set pixels of rgbFrameBitmap
         rgbFrameBitmap!!.setPixels(getRGBBytes(), 0, previewWidth, 0, 0, previewWidth, previewHeight)
 
-        readyForNextImage()
+        readyForNextImage()                 // close current image and prepare for next frame
 
-        val canvas = Canvas(croppedBitmap!!)
+        val canvas = Canvas(croppedBitmap!!)    // create canvas object using croppedBitmap
+
+        // draw on canvas through matrix using rgbFrameBitmap as data values
         canvas.drawBitmap(rgbFrameBitmap!!, frameToCropMat, null)
 
         //ImageUtils.saveBitmap(rgbFrameBitmap!!, "preview.png")
 
+        // run in a background thread
         runInBackground {
             val results: List<Detection> = detector.detectImage(croppedBitmap!!)
+            val lane  = laneDetector.detectLane(laneBitmap!!)
             copiedBitmap = Bitmap.createBitmap(croppedBitmap!!)
             val canvas1 = Canvas(copiedBitmap!!)
             val paint = Paint()
@@ -161,23 +217,27 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
             paint.style = Paint.Style.STROKE
             paint.strokeWidth = 2.0f
 
-            val minConfidence = MainActivity.MINIMUM_CONFIDENCE
+            val minConfidence = MainActivity.MINIMUM_CONFIDENCE // sets minimum confidence levels for detection
 
-            var mappedPredictions: MutableList<Detection> = LinkedList()
+            var mappedPredictions: MutableList<Detection> = LinkedList()    // create a list for detection map
 
+            /*
+                Go through every result of the object detection
+             */
             for (result in results) {
-                val location: RectF = result.location
+                val location: RectF = result.location           // get RectF location of detected object in image if any
 
                 Log.d("DETECTION",result.detectedClass.toString())
 
+                // if location is not null and the detection confidence is over threshold, then...
                 if (location != null && result.confidence >= minConfidence) {
-                    canvas1.drawRect(location, paint)
-                    cropToFrameMat.mapRect(location)
-                    result.location = location
-                    mappedPredictions.add(result)
+                    //canvas1.drawRect(location, paint)           // draw on canvas1 for the location of detected object
+                    cropToFrameMat.mapRect(location)            // add location rects to cropToFrameMat
+                    //result.location = location
+                    mappedPredictions.add(result)               // add result to mappedPredictions
                 }
             }
-            tracker.trackResults(mappedPredictions, 0)
+            tracker.trackResults(mappedPredictions, lane, 0)    // add mappedPredictions to tracker overlay
             trackingOverlay.postInvalidate()
 
             // Detect Violations
@@ -186,7 +246,10 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
             computingDetection = false
         }
     }
-
+    /********************************************************************************************************
+     * Detects violations within a frame
+     * @param results - the result list of detections within a frame
+     ********************************************************************************************************/
     @RequiresApi(Build.VERSION_CODES.N)
     private fun detectViolations(results: MutableList<Detection>) {
         /** Logic will be:
@@ -197,12 +260,13 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
          * 4.) if object is class 1, create new helmetList and add this object with the same id
          * 5.) if object is class 2, create new license plate and add this object
          * 6.) Check each of their rects: If helmet rect is within motorcycle rect, add it to that predictedMotorycle
-         *      object. Same with license plate
+         *      object. Same with license plate. Don't consider tricycles.
          * 7.) If rect is not, then discard
          * 8.) Finally, check each motorcycle object if their helmet has been initialized. Basically, if a motorcycle
          *      has a null helmet, then that motorcycle might not have a helmet. Add this to list of potential flags.
          *      Maybe add a license plate checker on the next frame to reconfirm if this object really does not have
-         *      a helmet.
+         *      a helmet. Issue is, there's no way to know if detection truly has no helmet since motorcyclist's head
+         *      can simply just be out of frame.
          */
         try{
             var motorcycleList: MutableList<MotorcycleObject> = ArrayList()
@@ -211,27 +275,28 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
             var tricycleList: MutableList<Detection> = ArrayList()
 
             var index = 0
-            var helmetIndex = 0
-            var lpIndex = 0
+            //var helmetIndex = 0
+            //var lpIndex = 0
             for(result in results){
-                if(result.detectedClass == 0){
+                if(result.detectedClass == 0){                                  // detect if motorcycle
                     val motorcycleObject = MotorcycleObject()
-                    result.id = index++.toString()
-                    motorcycleObject.motorcyclist = result
-                    motorcycleList.add(motorcycleObject)
+                    result.id = index++.toString()                              // increment index identifier
+                    motorcycleObject.motorcyclist = result                      // set the motorcyclist object
+                    motorcycleList.add(motorcycleObject)                        // add moto object to list
                     Log.d("MOTOR_DETECTED:", motorcycleList.size.toString())
                 }
 
                 if(result.detectedClass == 1){
                     //result.id = helmetIndex++.toString()
-                    helmetList.add(result)
+                    helmetList.add(result)                                      // add current helmet result in list
                 }
                 if(result.detectedClass == 2){
                     //result.id = lpIndex++.toString()
-                    lpList.add(result)
+                    lpList.add(result)                                          // add current lp in list
                 }
                 if(result.detectedClass == 3){
-                    tricycleList.add(result)
+                    tricycleList.add(result)                                    // add current tricycle in list
+                    Log.d("TRIKE_LOC", "Found Tricycle")
                 }
             }
             /**
@@ -242,9 +307,14 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
                 // Check if motorcycle is bound within a tricycle box. The requirements are the motorcycle must be
                 // Within the rects of half of the left side of the tricycle. Otherwise, it's most likely a tricycle.
                 for(tricycle in tricycleList){
+
+                    Log.d("TRICYCLE_LOC", "${tricycle.location.right}, ${tricycle.location.top}")
+                    // Create new Rect for tricycle consideration threshold
+                    val thresholdPoint = (tricycle.location.top - tricycle.location.bottom)/2
+
                     if(motorcycle.motorcyclist!!.location.intersects(
                             tricycle.location.left,
-                            tricycle.location.top,
+                            thresholdPoint,
                             tricycle.location.right,
                             tricycle.location.bottom
                         )){
@@ -286,24 +356,22 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
                 /**
                  * Check current potential violations list. If there is any, process the violations list.
                  */
-                val originalPotentialViolationsList = liveModel.getPotentialViolationsList()
-                for(potViolator in originalPotentialViolationsList!!){
+                val originalPotentialViolationsList = liveModel.getPotentialViolationsList() // Get potential list
+                for(potViolator in originalPotentialViolationsList!!){                      // check every pot vio
                     var potAddedToFinal = false
-                    for(lp in lpList){
+                    for(lp in lpList){                                                      // check if lp exists
                         /**
                          * TEMPORARY
                          */
-                        // IF THIS IS TRUE, THEN CONFIRM THE VIOLATION
-                        if(potViolator.potentialViolation && lp.location.intersects(
-                                potViolator.motorcyclist!!.location.left,
-                                potViolator.motorcyclist!!.location.top,
-                                potViolator.motorcyclist!!.location.right,
-                                potViolator.motorcyclist!!.location.bottom)) {
+                        // IF THIS IS TRUE, THEN CONFIRM THE VIOLATION. If previous violator is still in this frame,
+                        // Process it to final violation
+
+                        if(potViolator.potentialViolation && potViolator.motorcyclist!!.location.contains(lp.location)) {
                             // Remove from potential violations list
                             liveModel.removeFromPotentialViolationsList(potViolator)
                             // Call and prepare to save data in device or send over the network
                             processViolation(potViolator)
-                            Log.d("MOTOR_DETECTED", "NO HELMET FINAL VERDICT")
+
                             potAddedToFinal = true
                             break
                         }
@@ -314,6 +382,28 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
                         liveModel.removeFromPotentialViolationsList(potViolator)
                         Log.d("NO_VIOL", "No violators detected within current frame")
                     }
+                }
+                /** Check rect locations for overtaking/counterflowing
+                 *  Currently hardcoded
+                 */
+
+                if(motorcycle.licensePlate != null){
+                    val pointX = 1080 - motorcycle.licensePlate!!.detectedLicense.location.left.toInt() + (motorcycle.licensePlate!!.detectedLicense.location.width().toInt() / 2)
+                    val pointY = 1920 - motorcycle.motorcyclist!!.location.bottom.toInt()
+                    val pointOfReference = Point(pointX, pointY)
+                    Log.d("POINT_LP", "$pointX, $pointY")
+
+                    // Check if this point is within the path
+                    val a = Point(480, 1000)
+                    val b = Point(0, 640)
+                    val determinant = (b.y - a.y)*(pointOfReference.x - a.x) - (b.x - a.x)*(pointOfReference.y - a.y)
+                    Log.d("Determinant", "$determinant")
+                    if(determinant == 0){
+                        Log.d("LANE_CLASS", "Point is on line")
+                    }else if(determinant < 0){
+                        Log.d("PROC_VIOL", "COUNTERFLOWING DETECTED")
+                    }
+
                 }
 
                 /**
@@ -341,7 +431,7 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
             Runnable{
                 readLp(potViolator)
                 if(!liveModel.getReportedList()!!.contains(potViolator.licensePlate!!.licenseNumber)){
-                    Log.d("PROC_VIOL", "ADDING LICENSE" )
+                    Log.d("PROC_VIOL", "ADDING LICENSE ${potViolator.licensePlate!!.licenseNumber}" )
                     liveModel.addToReportedList(potViolator.licensePlate!!.licenseNumber)
                     liveModel.addToFinalViolationsList(potViolator)
                 }else{
@@ -400,6 +490,7 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
                     val replace = text.text.replace("\\s".toRegex(), "")
                     // Valid Philippine License Plate Numbers length, both Temporary and Permanent
                     if(replace.length == 6 || replace.length == 7 || replace.length == 11 || replace.length == 12 ){
+                        Log.d("LP_READ", text.text)
                         motorcycleObject.licensePlate!!.licenseNumber = text.text
                     }
                 }

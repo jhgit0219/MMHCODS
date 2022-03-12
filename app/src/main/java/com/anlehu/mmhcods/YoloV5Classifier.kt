@@ -28,23 +28,21 @@ import android.util.Log
 import androidx.annotation.RequiresApi
 import com.anlehu.mmhcods.utils.DetectionComparator
 import com.anlehu.mmhcods.utils.Detector
-import com.anlehu.mmhcods.utils.Detector.*
+import com.anlehu.mmhcods.utils.Detector.Detection
 import com.anlehu.mmhcods.utils.Utils
 import org.checkerframework.checker.nullness.qual.NonNull
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.Tensor
+import org.tensorflow.lite.gpu.CompatibilityList
 import org.tensorflow.lite.gpu.GpuDelegate
 import org.tensorflow.lite.nnapi.NnApiDelegate
 import java.io.BufferedReader
 import java.io.IOException
 import java.io.InputStreamReader
-import java.lang.Exception
-import java.lang.RuntimeException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.MappedByteBuffer
 import java.util.*
-import kotlin.collections.ArrayList
 import kotlin.math.pow
 
 /**
@@ -242,6 +240,12 @@ open class YoloV5Classifier: Detector {
         imgData!!.rewind()
         for (i in 0 until INPUT_SIZE) {
             for (j in 0 until INPUT_SIZE) {
+                /**
+                 *  The "stride" value is equal to the height value because this is a flat array
+                 *  e.g. Each height (i) contains a value from index 0 to width. Traversing to the next i,
+                 *  just have to multiply i by the width ( next i, j=0)
+                 */
+
                 val pixelValue = intValues[i * INPUT_SIZE + j]
                 if (isModelQuantized) {
                     // Quantized model
@@ -391,7 +395,7 @@ open class YoloV5Classifier: Detector {
     companion object{
 
         // Number of threads in the java app
-        val NUM_THREADS = 4
+        val NUM_THREADS = 2
         val isNNAPI = false
         val isGPU = true
         /**
@@ -437,11 +441,14 @@ open class YoloV5Classifier: Detector {
                     }
                 }
                 if (isGPU) {
-                    val gpu_options: GpuDelegate.Options = GpuDelegate.Options()
+                    /*val gpu_options: GpuDelegate.Options = GpuDelegate.Options()
                     gpu_options.setPrecisionLossAllowed(true)
                     gpu_options.setInferencePreference(GpuDelegate.Options.INFERENCE_PREFERENCE_SUSTAINED_SPEED)
                     d.gpuDelegate = GpuDelegate(gpu_options)
-                    options.addDelegate(d.gpuDelegate)
+                    options.addDelegate(d.gpuDelegate)*/
+                    options.apply{
+                        this.addDelegate(GpuDelegate(CompatibilityList().bestOptionsForThisDevice))
+                    }
                 }
                 d.tfliteModel = Utils.loadModelFile(assetManager, modelFilename)
                 d.tfLite = Interpreter(d.tfliteModel!!, options)

@@ -2,18 +2,19 @@ package com.anlehu.mmhcods
 
 import android.app.ActivityManager
 import android.content.Intent
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.widget.Button
-import android.widget.Toast
-import java.io.IOException
+import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var detector: YoloV5Classifier
     private lateinit var startButton: Button
 
-
+    /**
+     * On create function of main activity.
+     * @param savedInstanceState - Bundle? object
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -80,12 +81,17 @@ class MainActivity : AppCompatActivity() {
         }*/
     }
 
-
+    /**
+     * companion objects
+     */
     companion object{
+
         var MINIMUM_CONFIDENCE = 0.4f
         var IS_QUANTIZED = false
-        var MAIN_MODEL_NAME: String = "main_detector.tflite"
+        var MAIN_MODEL_NAME: String = "main_detector_trike.tflite"
+        var LANE_MODEL_NAME: String = "lane_detector.tflite"
         var MAIN_LABELS_NAME: String = "file:///android_asset/main_labels.txt"
+        var LANE_LABELS_NAME: String = "file:///android_asset/lane_labels.txt"
 
         var MAINTAIN_ASPECT = true
 

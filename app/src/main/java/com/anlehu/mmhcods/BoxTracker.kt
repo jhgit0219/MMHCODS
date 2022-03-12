@@ -7,7 +7,7 @@ import android.util.Log
 import android.util.Pair
 import android.util.TypedValue
 import com.anlehu.mmhcods.utils.BorderedText
-import com.anlehu.mmhcods.utils.Detector.*
+import com.anlehu.mmhcods.utils.Detector.Detection
 import com.anlehu.mmhcods.utils.ImageUtils
 import java.util.*
 
@@ -22,6 +22,7 @@ class BoxTracker {
     private var sensorOrientation: Int = 0
 
     private var screenRects: MutableList<Pair<Float, RectF>> = LinkedList()
+    private lateinit var lanePoints: FloatArray
 
     var frameToCanvasMat: Matrix = Matrix()
 
@@ -57,6 +58,7 @@ class BoxTracker {
         frameWidth = width
         frameHeight = height
         this.sensorOrientation = sensorOrientation
+        lanePoints = FloatArray(0)
     }
 
     @Synchronized
@@ -109,17 +111,23 @@ class BoxTracker {
                 canvas, trackedPos.left + cornerSize, trackedPos.top, "$labelString%", boxPaint
             )
         }
+        boxPaint.color = Color.YELLOW
+        //canvas.drawLines(lanePoints, boxPaint)
+        canvas.drawLine(0f, 1280f, 480f, 920f, boxPaint)
     }
 
     @Synchronized
-    fun trackResults(results: List<Detection>, timeStamp: Long){
+    fun trackResults(results: List<Detection>, lane: FloatArray, timeStamp: Long){
         Log.i("BoxTracker:", "${results.size} results from $timeStamp")
-        processResults(results)
+        processResults(results, lane)
     }
 
-    private fun processResults(results: List<Detection>) {
+    private fun processResults(results: List<Detection>, lane: FloatArray) {
         // rectangles to track
-        var rectsToTrack: MutableList<Pair<Float, Detection>> = LinkedList()
+        val rectsToTrack: MutableList<Pair<Float, Detection>> = LinkedList()
+
+        // set lane points
+        lanePoints = lane
 
         // clear current rectangles on screen
         screenRects.clear()

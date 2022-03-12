@@ -20,13 +20,9 @@ import android.util.SparseIntArray
 import android.view.*
 import androidx.fragment.app.Fragment
 import com.anlehu.mmhcods.views.AutoAdjustView
-import java.lang.IllegalStateException
-import java.lang.RuntimeException
 import java.util.*
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
-import kotlin.Exception
-import kotlin.collections.ArrayList
 
 class CameraFragment() : Fragment() {
 
@@ -50,7 +46,7 @@ class CameraFragment() : Fragment() {
     private var backgroundHandler: Handler? = null
     private var layout: Int = 0
 
-    var MINIMUM_PREVIEW_SIZE = 320
+    private var MINIMUM_PREVIEW_SIZE = 640
 
     /** Semaphore to lock camera; won't allow app to exit before camera closes**/
     var cameraLock: Semaphore = Semaphore(1)
@@ -129,6 +125,7 @@ class CameraFragment() : Fragment() {
 
         var exactSizeFound = false
         for(option in choices){
+            Log.d("RESO", "${option.width} x ${option.height}")
             if(option == desiredSize)
                 exactSizeFound = true
             if(option.height >= minSize && option.width >= minSize)
@@ -184,11 +181,12 @@ class CameraFragment() : Fragment() {
 
             sensorOrientation = cameraCharacteristics.get(CameraCharacteristics.SENSOR_ORIENTATION)!!.toInt()
             previewSize = chooseOptimalSize(map!!.getOutputSizes(SurfaceTexture::class.java), inputSize.width, inputSize.height)
+            //previewSize = Size(1920, 1080)
             val orientation = resources.configuration.orientation
             if(orientation == Configuration.ORIENTATION_LANDSCAPE){
-                adjustView.setAspectRatio(previewSize.width, previewSize.height)
+                adjustView.setAspectRatio(previewSize.width, previewSize.height, true)
             }else{
-                adjustView.setAspectRatio(previewSize.height, previewSize.width)
+                adjustView.setAspectRatio(previewSize.height, previewSize.width, true)
             }
         }catch(e: Exception){
             throw IllegalStateException(e)
