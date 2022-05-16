@@ -8,3 +8,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "MMHCODS"
 include ':app'
+include ':opencv'

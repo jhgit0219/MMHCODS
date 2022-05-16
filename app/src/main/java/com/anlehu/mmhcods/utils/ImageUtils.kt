@@ -1,18 +1,27 @@
 package com.anlehu.mmhcods.utils
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.os.Environment
 import android.util.Log
+import org.opencv.android.Utils
+import org.opencv.core.Core
+import org.opencv.core.CvType
+import org.opencv.core.Mat
+import org.opencv.core.Scalar
+import org.opencv.imgproc.Imgproc
 import java.io.File
 import java.io.FileOutputStream
-import java.lang.Exception
 import kotlin.math.abs
 import kotlin.math.max
 
 class ImageUtils {
 
     companion object{
+        /********************************************************************************************************
+         * Gets transformation matrix
+         ********************************************************************************************************/
         fun getTransformationMatrix(
             previewWidth: Int,
             previewHeight: Int,
@@ -61,17 +70,20 @@ class ImageUtils {
             return matrix
 
         }
-
+        /********************************************************************************************************
+         * Saves image to device
+         ********************************************************************************************************/
         fun saveBitmap(bitmap: Bitmap, filename: String) {
-            val root = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM).absolutePath
+            val root = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM).absolutePath+"/test"
             Log.i("Saving bitmap to", "${bitmap.width}, ${bitmap.height}, $root")
             val myDir = File(root)
             if (!myDir.mkdirs()) {
                 Log.e("ERROR", "MKDIR FAILED")
             }
-            val file = File(myDir, filename)
+            val file = File(myDir, filename+".png")
             if (file.exists()) {
                 file.delete()
+                Log.d("DEL", "FILE DELETED")
             }
             try {
                 val out = FileOutputStream(file)
@@ -81,6 +93,51 @@ class ImageUtils {
             } catch (e: Exception) {
                 e.toString()
             }
+        }
+
+        /********************************************************************************************************
+         * Resizes image to fit model input dimensions
+         ********************************************************************************************************/
+        fun rescaleImage(inpBitmap: Bitmap?, path: String): Bitmap{
+
+            var bitmap: Bitmap
+            var fileName: String
+
+            if(inpBitmap == null){
+                var opt = BitmapFactory.Options()
+                opt.inPreferredConfig = Bitmap.Config.ARGB_8888
+                bitmap = BitmapFactory.decodeFile(path, opt)
+                fileName = path.substringBeforeLast('.').substring(path.substringBeforeLast('.').length - 4)
+            }else{
+                bitmap = inpBitmap!!
+                fileName = "Test Bitmap"
+            }
+
+            val oldHeight = bitmap.height
+            val oldWidth = bitmap.width
+
+            val ratio = (640.0 / max(oldHeight, oldWidth))
+            val newSize = listOf((oldWidth * ratio), (oldHeight*ratio))
+
+            var srcMat = Mat(oldHeight, oldWidth, CvType.CV_8UC4, Scalar(4.0))
+            val dstMat = Mat(640, 640, CvType.CV_8UC4, Scalar(4.0))
+
+            Utils.bitmapToMat(bitmap, srcMat)
+            Log.d("MAT_SIZE", srcMat.cols().toString()+" ratio: $ratio oldHeight: $oldHeight oldWidth: $oldWidth")
+            Imgproc.resize(srcMat, dstMat, org.opencv.core.Size(), ratio, ratio, Imgproc.INTER_AREA)
+
+            val deltaW = 640 - newSize[0]
+            val deltaH = 640 - newSize[1]
+            val top = deltaH.toInt().floorDiv(2)
+            val bottom = deltaH.toInt() - deltaH.toInt().floorDiv(2)
+            val left = deltaW.toInt().floorDiv(2)
+            val right = deltaW.toInt() - deltaW.toInt().floorDiv(2)
+
+            Core.copyMakeBorder(dstMat, dstMat, top, bottom, left, right, Core.BORDER_CONSTANT, Scalar(0.0, 0.0, 0.0, 255.0))
+            bitmap = Bitmap.createBitmap(dstMat.width(), dstMat.height(), Bitmap.Config.ARGB_8888)
+            Utils.matToBitmap(dstMat, bitmap)
+            saveBitmap(bitmap, fileName)
+            return bitmap
         }
 
         fun convertYUVtoARGB(

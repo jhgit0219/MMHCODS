@@ -29,7 +29,7 @@ import androidx.annotation.RequiresApi
 import com.anlehu.mmhcods.utils.DetectionComparator
 import com.anlehu.mmhcods.utils.Detector
 import com.anlehu.mmhcods.utils.Detector.Detection
-import com.anlehu.mmhcods.utils.Utils
+import com.anlehu.mmhcods.utils.ModelUtils
 import org.checkerframework.checker.nullness.qual.NonNull
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.Tensor
@@ -450,7 +450,7 @@ open class YoloV5Classifier: Detector {
                         this.addDelegate(GpuDelegate(CompatibilityList().bestOptionsForThisDevice))
                     }
                 }
-                d.tfliteModel = Utils.loadModelFile(assetManager, modelFilename)
+                d.tfliteModel = ModelUtils.loadModelFile(assetManager, modelFilename)
                 d.tfLite = Interpreter(d.tfliteModel!!, options)
             } catch (e: Exception) {
                 throw RuntimeException(e)

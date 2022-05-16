@@ -7,7 +7,7 @@ import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
 import com.anlehu.mmhcods.utils.Detector
-import com.anlehu.mmhcods.utils.Utils
+import com.anlehu.mmhcods.utils.ModelUtils
 import org.checkerframework.checker.nullness.qual.NonNull
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.Tensor
@@ -363,7 +363,7 @@ class LaneClassifier: Detector {
                         this.addDelegate(GpuDelegate(CompatibilityList().bestOptionsForThisDevice))
                     }
                 }
-                d.tfliteModel = Utils.loadModelFile(assetManager, modelFilename)
+                d.tfliteModel = ModelUtils.loadModelFile(assetManager, modelFilename)
                 d.tfLite = Interpreter(d.tfliteModel!!, options)
                 Log.d("Lane_GPU","Creating lane model")
             } catch (e: Exception) {

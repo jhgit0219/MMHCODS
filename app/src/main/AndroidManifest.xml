@@ -14,6 +14,10 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.INTERNET"/>
 
+    <supports-screens android:largeScreens="true"
+        android:normalScreens="true"
+        android:smallScreens="true" android:xlargeScreens="true"/>
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -36,6 +40,7 @@
         </activity>
         <activity android:name="com.anlehu.mmhcods.CameraActivity"></activity>
         <activity android:name="com.anlehu.mmhcods.DetectorActivity"></activity>
+        <activity android:name="com.anlehu.mmhcods.TestActivity"></activity>
     </application>
 
 

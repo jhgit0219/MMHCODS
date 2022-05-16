@@ -113,7 +113,6 @@ class BoxTracker {
         }
         boxPaint.color = Color.YELLOW
         //canvas.drawLines(lanePoints, boxPaint)
-        canvas.drawLine(0f, 1280f, 480f, 920f, boxPaint)
     }
 
     @Synchronized

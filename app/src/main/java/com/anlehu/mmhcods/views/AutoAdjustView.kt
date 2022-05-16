@@ -2,13 +2,14 @@ package com.anlehu.mmhcods.views
 
 import android.content.Context
 import android.util.AttributeSet
+import android.util.Log
 import android.view.TextureView
 import android.view.ViewGroup.MarginLayoutParams
 
 class AutoAdjustView: TextureView {
     var widthRatio = 0
     var heightRatio = 0
-    var keepAspect = false
+    var keepAspect = true
 
     constructor(context: Context): this(context, null)
     constructor(context: Context, attributeSet: AttributeSet?) : this(context, attributeSet!!, 0)
@@ -18,6 +19,7 @@ class AutoAdjustView: TextureView {
         if(width < 0 || height < 0){
             throw IllegalArgumentException("Size below 0")
         }
+        Log.d("ASPECT", "$width x $height")
         widthRatio = width
         heightRatio = height
         keepAspect = bool
@@ -49,6 +51,4 @@ class AutoAdjustView: TextureView {
             }
         }
     }
-
-    //private fun squareTransform()
 }

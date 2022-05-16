@@ -5,11 +5,12 @@ import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
 import androidx.appcompat.app.AppCompatActivity
+import org.opencv.android.OpenCVLoader
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var detector: YoloV5Classifier
     private lateinit var startButton: Button
+    private lateinit var testButton: Button
 
     /**
      * On create function of main activity.
@@ -19,12 +20,24 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        OpenCVLoader.initDebug()
+
         startButton = findViewById(R.id.start_button)
         startButton.setOnClickListener {
             startActivity(
                 Intent(
                     this@MainActivity,
                     DetectorActivity::class.java
+                )
+            )
+        }
+
+        testButton = findViewById(R.id.test_button)
+        testButton.setOnClickListener{
+            startActivity(
+                Intent(
+                    this@MainActivity,
+                    TestActivity::class.java
                 )
             )
         }
@@ -92,7 +105,6 @@ class MainActivity : AppCompatActivity() {
         var LANE_MODEL_NAME: String = "lane_detector.tflite"
         var MAIN_LABELS_NAME: String = "file:///android_asset/main_labels.txt"
         var LANE_LABELS_NAME: String = "file:///android_asset/lane_labels.txt"
-
         var MAINTAIN_ASPECT = true
 
     }

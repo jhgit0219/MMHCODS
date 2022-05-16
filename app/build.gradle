@@ -41,6 +41,15 @@ android {
 project.ext.ASSET_DIR = projectDir.toString() + '/src/main/assets'
 project.ext.TMP_DIR = project.buildDir.toString() + '/downloads'
 
+android {
+    packagingOptions {
+        pickFirst 'lib/arm64-v8a/libc++_shared.so'
+        pickFirst 'lib/x86/libc++_shared.so'
+        pickFirst 'lib/x86_64/libc++_shared.so'
+        pickFirst 'lib/armeabi-v7a/libc++_shared.so'
+    }
+}
+
 dependencies {
 
     implementation 'androidx.core:core-ktx:1.7.0'
@@ -57,4 +66,6 @@ dependencies {
     implementation 'org.tensorflow:tensorflow-lite:2.4.0'
     implementation 'org.tensorflow:tensorflow-lite-gpu:2.4.0'
     implementation 'com.google.android.gms:play-services-mlkit-text-recognition:17.0.0'
+    // OpenCV 4.5.4
+    implementation project(":opencv")
 }
