@@ -6,15 +6,41 @@ import android.net.Uri
 import android.os.Build
 import android.os.storage.StorageManager
 import android.provider.DocumentsContract
+import androidx.annotation.RequiresApi
 import java.io.File
 import java.lang.reflect.Method
+import java.time.Duration
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.util.concurrent.TimeUnit
 
 
 class FileUtil {
-
+    @RequiresApi(Build.VERSION_CODES.O)
     companion object {
 
         private val PRIMARY_VOLUME_NAME = "primary"
+
+        private val format = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss")
+
+        fun getDateTime(): LocalDateTime {
+            return LocalDateTime.now()
+        }
+
+        fun stringToDate(str: String): LocalDateTime {
+            return LocalDateTime.parse(str, format)
+        }
+
+        fun DateToString(time: LocalDateTime): String{
+            return time.format(format)
+        }
+
+
+        fun elapsedTime(time_1: LocalDateTime, time_2: LocalDateTime): Long {
+            var duration = Duration.between(time_1, time_2).toMillis()
+            return TimeUnit.MILLISECONDS.toSeconds(duration)
+        }
+
         fun getFullPathFromTreeUri(treeUri: Uri?, con: Context?): String? {
             if (treeUri == null) return null
             var volumePath = getVolumePath(getVolumeIdFromTreeUri(treeUri), con!!) ?: return File.separator
