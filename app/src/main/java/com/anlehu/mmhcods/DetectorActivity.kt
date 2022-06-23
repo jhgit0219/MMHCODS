@@ -30,6 +30,8 @@ import java.util.*
 
 class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
 
+
+
     private lateinit var trackingOverlay: OverlayView
     private lateinit var frameToCropMat: Matrix
     private lateinit var cropToFrameMat: Matrix
@@ -102,7 +104,7 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
 
         try{
             detector = DetectorFactory.getDetector(assets, MainActivity.MAIN_MODEL_NAME)
-            laneDetector = DetectorFactory.getLaneDetector(assets, MainActivity.LANE_MODEL_NAME)
+            //laneDetector = DetectorFactory.getLaneDetector(assets, MainActivity.LANE_MODEL_NAME)
         }catch(e: Exception){
             Toast.makeText(this, "Classifier/s can't be initiated", Toast.LENGTH_SHORT).show()
             finish()
@@ -115,8 +117,10 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
         tracker = BoxTracker(this)
 
         val cropSize = detector.getInputSize()
-        val inputWidth = laneDetector.INPUT_WIDTH
-        val inputHeight = laneDetector.INPUT_HEIGHT
+        //val inputWidth = laneDetector.INPUT_WIDTH
+        val inputWidth = 1280
+        //val inputHeight = laneDetector.INPUT_HEIGHT
+        val inputHeight = 720
 
         Log.d("CROP_SIZE", "${detector.getInputSize()}")
 
@@ -209,7 +213,7 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
         // run in a background thread
         runInBackground {
             val results: List<Detection> = detector.detectImage(croppedBitmap!!)
-            val lane  = laneDetector.detectLane(laneBitmap!!)
+            //val lane  = laneDetector.detectLane(laneBitmap!!)
             copiedBitmap = Bitmap.createBitmap(croppedBitmap!!)
             val canvas1 = Canvas(copiedBitmap!!)
             val paint = Paint()
@@ -237,7 +241,7 @@ class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
                     mappedPredictions.add(result)               // add result to mappedPredictions
                 }
             }
-            tracker.trackResults(mappedPredictions, lane, 0)    // add mappedPredictions to tracker overlay
+            //tracker.trackResults(mappedPredictions, lane, 0)    // add mappedPredictions to tracker overlay
             trackingOverlay.postInvalidate()
 
             // Detect Violations

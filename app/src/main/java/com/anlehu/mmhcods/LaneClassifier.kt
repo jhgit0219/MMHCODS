@@ -1,28 +1,72 @@
 package com.anlehu.mmhcods
 
+import android.app.Activity
+import android.content.Context
 import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.graphics.RectF
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
+import androidx.appcompat.app.AppCompatActivity
+import com.anlehu.mmhcods.utils.DetectionComparator
 import com.anlehu.mmhcods.utils.Detector
 import com.anlehu.mmhcods.utils.Utils
-import org.checkerframework.checker.nullness.qual.NonNull
+import com.anlehu.mmhcods.views.OverlayView
+import com.google.android.gms.tasks.Task
+import com.google.android.gms.tasks.TaskCompletionSource
+import org.checkerframework.checker.units.qual.m
+import org.opencv.core.Mat
+import org.opencv.core.Size
+import org.opencv.imgcodecs.Imgcodecs
+import org.opencv.imgproc.Imgproc
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.Tensor
 import org.tensorflow.lite.gpu.CompatibilityList
 import org.tensorflow.lite.gpu.GpuDelegate
 import org.tensorflow.lite.nnapi.NnApiDelegate
 import java.io.BufferedReader
+import java.io.FileInputStream
 import java.io.IOException
 import java.io.InputStreamReader
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.MappedByteBuffer
+import java.nio.channels.FileChannel
 import java.util.*
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+import android.os.Environment.getExternalStorageDirectory
 
-class LaneClassifier: Detector {
+
+class LaneClassifier(private val context: Context)  : Activity(),  Detector {
+
+    private lateinit var trackingOverlay: OverlayView
+
+
+    val tusimple_row_anchor = arrayOf( 64,  68,  72,  76,  80,  84,  88,  92,  96, 100, 104, 108, 112,
+        116, 120, 124, 128, 132, 136, 140, 144, 148, 152, 156, 160, 164,
+        168, 172, 176, 180, 184, 188, 192, 196, 200, 204, 208, 212, 216,
+        220, 224, 228, 232, 236, 240, 244, 248, 252, 256, 260, 264, 268,
+        272, 276, 280, 284 )
+    private var interpreter: Interpreter? = null
+    var isInitialized = false
+        private set
+
+    private var inputImageWidth: Int = 0 // will be inferred from TF Lite model.
+    private var inputImageHeight: Int = 0 // will be inferred from TF Lite model.
+    private var modelInputSize: Int = 0 // will be inferred from TF Lite model.
+
+    private var outputImageWidth: Int = 0 // will be inferred from TF Lite model.
+    private var outputImageHeight: Int = 0 // will be inferred from TF Lite model.
+    private var modelOutputSize: Int = 0 // will be inferred from TF Lite model.
+
+    private val executorService: ExecutorService = Executors.newCachedThreadPool()
+
+
+    var lane_points_mat = ArrayList<Float>()
+    var lanes_detected = ArrayList<Boolean>()
 
     // Config values.
     // Pre-allocated buffers.
@@ -32,7 +76,7 @@ class LaneClassifier: Detector {
     }
 
     private val labels = Vector<String>()
-    private var intValues: IntArray = IntArray(1)
+    private var intValues: IntArray = IntArray(288 * 800)
 
     private var imgData: ByteBuffer? = null
     private var outData: ByteBuffer? = null
@@ -44,22 +88,166 @@ class LaneClassifier: Detector {
     private var oup_zero_point = 0
     private var numClass = 0
 
+    //for imageToBitmap (can delete once not needed anymore)
+
+
+//    public fun LaneClassifier()
+//    {
+//    }
+
+
+    fun initialize(): Task<Void?> {
+        val task = TaskCompletionSource<Void?>()
+        executorService.execute {
+            try {
+                initializeInterpreter()
+                task.setResult(null)
+            } catch (e: IOException) {
+                task.setException(e)
+            }
+        }
+        return task.task
+    }
+
+
+    public fun initializeInterpreter(){
+
+        val assetManager = context.assets
+        val model = loadModelFile(assetManager, "model_float32.tflite")
+        val interpreter = Interpreter(model)
+
+        val inputShape = interpreter.getInputTensor(0).shape()
+        inputImageWidth = inputShape[1]
+        inputImageHeight = inputShape[2]
+        Log.d("INTPUTIMAGEWIDTH","INTPUTIMAGEWIDTH"+inputImageWidth.toString())
+        Log.d("INPUTIMAGEHEIGHT","INPUTIMAGEHEIGHT"+inputImageHeight.toString())
+        modelInputSize = FLOAT_TYPE_SIZE * inputImageWidth *
+                inputImageHeight * PIXEL_SIZE
+
+        val outputShape = interpreter.getOutputTensor(0).shape()
+        outputImageWidth = outputShape[1]
+        outputImageHeight = outputShape[2]
+        modelOutputSize = FLOAT_TYPE_SIZE * outputImageWidth *
+                outputImageHeight * PIXEL_SIZE
+        // Finish interpreter initialization.
+        this.interpreter = interpreter
+        isInitialized = true
+        Log.d(TAG, "Initialized TFLite interpreter.")
+
+    }
+
+
+
+    @Throws(IOException::class)
+    public fun loadModelFile(assetManager: AssetManager, filename: String): ByteBuffer {
+        val fileDescriptor = assetManager.openFd(filename)
+        val inputStream = FileInputStream(fileDescriptor.fileDescriptor)
+        val fileChannel = inputStream.channel
+        val startOffset = fileDescriptor.startOffset
+        val declaredLength = fileDescriptor.declaredLength
+        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
+    }
+
+    fun imageToBitmap() {
+//        val d : Drawable
+//        d = context.resources.getDrawable(R.drawable.detected_lanes)
+//        val bitmap = Bitmap.createBitmap(
+//            d.intrinsicHeight,
+//            d.intrinsicWidth,
+//            Bitmap.Config.ARGB_8888
+//        )
+        //val path : String = getExternalStorageDirectory().getAbsolutePath() + "/detected_lanes.png"
+        val imgMat = Imgcodecs.imread("/storage/emulated/0/Download/detected_lanes.jpg")
+        Imgproc.cvtColor(imgMat, imgMat, Imgproc.COLOR_BGR2RGB)
+//        val tempBitmap : Bitmap
+//        org.opencv.android.Utils.matToBitmap(imgMat,tempBitmap)
+        //val bitmap = BitmapFactory.decodeResource(context.resources, R.drawable.detected_lanes)
+        Log.d("Image","Mat: "+imgMat.toString())
+//        Log.i("bitmap",$bitmap)
+        classifyAsync(imgMat)
+
+    }
+
+    public fun classify(mat: Mat): String {
+        check(isInitialized) { "TF Lite Interpreter is not initialized yet." }
+
+        // TODO: Add code to run inference with TF Lite.
+        // Pre-processing: resize the input image to match the model input shape.
+//        var resizedImage = Bitmap.createScaledBitmap(
+//            bitmap,
+//            inputImageWidth,
+//            inputImageHeight,
+//            true
+//        )
+        val imgSize = Size(inputImageWidth.toDouble(), inputImageHeight.toDouble())
+        var resizedImage = Imgproc.resize(mat, mat, imgSize, 0.toDouble(), 0.toDouble(), Imgproc.INTER_AREA)
+
+        Log.d("ResizedImage","resized image: "+resizedImage.toString())
+        //resizedImage = resizedImage(DataType.FLOAT32)X
+        val bytes = ByteArray(mat.rows() * mat.cols() * mat.channels())
+
+        mat.get(0, 0, bytes)
+        var byteBuffer : ByteBuffer = ByteBuffer.wrap(bytes)
+        Log.d("bytebuffer","bytebuffer: "+byteBuffer.toString())
+        //byteBuffer = byteBuffer(DataType.FLOAT32)
+        //var floatByteBuffer = byteBuffer(DataType.FLOAT32)
+
+
+        // Define an array to store the model output.
+        val output = Array(1) {
+            Array(101) {
+                Array(56) {
+                    FloatArray(4)
+                }
+            }
+        }
+        Log.d("output r","output row: "+output.size.toString())
+        Log.d("output c","output column: "+output[0].size.toString())
+        // Run inference with the input data.
+        interpreter?.run(byteBuffer, output)
+        Log.d("Output after interpreter","output: "+output.contentDeepToString())
+        // Post-processing: find the digit that has the highest probability
+        // and return it a human-readable string.
+
+
+        val result = output[0]          //Checking if this is the output to use (output[0]) or just output
+
+       /* val resized_Result = Bitmap.createScaledBitmap(
+            output,
+            outputImageWidth,
+            outputImageHeight,
+            true
+
+        )*/
+        Log.d("Result output","result: "+result.toString())
+//        val maxIndex = result.indices.maxByOrNull { result[it] } ?: -1
+//        val resultString =
+//            "Prediction Result: %d\nConfidence: %2f"
+//                .format(maxIndex, result[maxIndex])
+//
+//        Log.d("ResultString","resultString: "+resultString.toString())
+        //return resultString
+        return "nice"
+    }
+
+    fun classifyAsync(mat: Mat): Task<String> {
+        val task = TaskCompletionSource<String>()
+        executorService.execute {
+            val result = classify(mat)
+            task.setResult(result)
+        }
+        return task.task
+    }
+
     override fun detectImage(bitmap: Bitmap): ArrayList<Detector.Detection> {
         return ArrayList()
     }
 
     override fun close() {
-        tfLite!!.close()
-        tfLite = null
-        if (gpuDelegate != null) {
-            gpuDelegate!!.close()
-            gpuDelegate = null
+        executorService.execute {
+            interpreter?.close()
+            Log.d(TAG, "Closed TFLite interpreter.")
         }
-        if (nnapiDelegate != null) {
-            nnapiDelegate!!.close()
-            nnapiDelegate = null
-        }
-        tfliteModel = null
     }
 
     override fun setNumOfThreads(numThread: Int) {
@@ -73,7 +261,7 @@ class LaneClassifier: Detector {
     private fun recreateInterpreter() {
         if (tfLite != null) {
             tfLite!!.close()
-            tfLite = Interpreter(tfliteModel as @NonNull ByteBuffer, tfliteOptions)
+            tfLite = Interpreter(tfliteModel as ByteBuffer, tfliteOptions)
         }
     }
 
@@ -107,7 +295,9 @@ class LaneClassifier: Detector {
     //config lane detector
     var INPUT_WIDTH: Int = -1
     var INPUT_HEIGHT: Int = -1
+
     private var output_box = 0
+
 
     private var isModelQuantized = false
 
@@ -123,14 +313,17 @@ class LaneClassifier: Detector {
     /** Options for configuring the Interpreter.  */
     private val tfliteOptions: Interpreter.Options = Interpreter.Options()
 
-    /*
+
+
     //non maximum suppression
     @RequiresApi(Build.VERSION_CODES.N)
     open fun nms(list: ArrayList<Detector.Detection>): ArrayList<Detector.Detection> {
         val nmsList = ArrayList<Detector.Detection>()
         for (k in labels.indices) {
             //1.find max confidence per class
-            val pq: PriorityQueue<Detector.Detection> = PriorityQueue<Detector.Detection>(DetectionComparator)
+            val pq: PriorityQueue<Detector.Detection> = PriorityQueue<Detector.Detection>(
+                DetectionComparator
+            )
             for (i in list.indices) {
                 if (list[i].detectedClass == k) {
                     pq.add(list[i])
@@ -156,7 +349,7 @@ class LaneClassifier: Detector {
         }
         return nmsList
     }
-    */
+
 
     private val mNmsThresh = 0.6f
 
@@ -194,37 +387,61 @@ class LaneClassifier: Detector {
     protected val BATCH_SIZE = 1
     protected val PIXEL_SIZE = 3
 
-    /**
-     * Writes Image data into a `ByteBuffer`.
-     */
-    private fun convertBitmapToByteBuffer(bitmap: Bitmap){
-//        ByteBuffer byteBuffer = ByteBuffer.allocateDirect(4 * BATCH_SIZE * INPUT_SIZE * INPUT_SIZE * PIXEL_SIZE);
-//        byteBuffer.order(ByteOrder.nativeOrder());
-//        int[] intValues = new int[INPUT_SIZE * INPUT_SIZE];
-        bitmap.getPixels(intValues, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-        val pixel = 0
-        imgData!!.rewind()
-        for (i in 0 until INPUT_HEIGHT) {
-            for (j in 0 until INPUT_WIDTH) {
-                val pixelValue = intValues[i * INPUT_WIDTH + j]
-                if (isModelQuantized) {
-                    // Quantized model
-                    imgData!!.put((((pixelValue shr 16 and 0xFF) - IMAGE_MEAN) / IMAGE_STD / inp_scale + inp_zero_point) as Byte)
-                    imgData!!.put((((pixelValue shr 8 and 0xFF) - IMAGE_MEAN) / IMAGE_STD / inp_scale + inp_zero_point) as Byte)
-                    imgData!!.put((((pixelValue and 0xFF) - IMAGE_MEAN) / IMAGE_STD / inp_scale + inp_zero_point) as Byte)
-                } else { // Float model
-                    imgData!!.putFloat(((pixelValue shr 16 and 0xFF) - IMAGE_MEAN) / IMAGE_STD)
-                    imgData!!.putFloat(((pixelValue shr 8 and 0xFF) - IMAGE_MEAN) / IMAGE_STD)
-                    imgData!!.putFloat(((pixelValue and 0xFF) - IMAGE_MEAN) / IMAGE_STD)
-                }
-            }
-        }//return imgData
-    }
+
+     // Writes Image data into a `ByteBuffer`.
+
+//    private fun convertBitmapToByteBuffer(bitmap: Bitmap): ByteBuffer? {
+//        val byteBuffer = ByteBuffer.allocateDirect(4 * BATCH_SIZE * 288 * 800 * 3)
+//        byteBuffer.order(ByteOrder.nativeOrder())
+//        val intValues = IntArray(288*800)
+//        bitmap.getPixels(intValues, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+//        val pixel = 0
+//        //imgData!!.rewind()
+//        for (i in 0 until INPUT_HEIGHT) {
+//            for (j in 0 until INPUT_WIDTH) {
+//                val pixelValue = intValues[i * INPUT_WIDTH + j]
+//                if (isModelQuantized) {
+//                    // Quantized model
+//                    byteBuffer.put((((pixelValue shr 16 and 0xFF) - IMAGE_MEAN) / IMAGE_STD / inp_scale + inp_zero_point) as Byte)
+//                    byteBuffer.put((((pixelValue shr 8 and 0xFF) - IMAGE_MEAN) / IMAGE_STD / inp_scale + inp_zero_point) as Byte)
+//                    byteBuffer.put((((pixelValue and 0xFF) - IMAGE_MEAN) / IMAGE_STD / inp_scale + inp_zero_point) as Byte)
+//                } else { // Float model
+//                    byteBuffer.putFloat(((pixelValue shr 16 and 0xFF) - IMAGE_MEAN) / IMAGE_STD)
+//                    byteBuffer.putFloat(((pixelValue shr 8 and 0xFF) - IMAGE_MEAN) / IMAGE_STD)
+//                    byteBuffer.putFloat(((pixelValue and 0xFF) - IMAGE_MEAN) / IMAGE_STD)
+//                }
+//            }
+//        }
+//        return byteBuffer
+//    }
+
+
+    /*private fun convertBitmapToByteBuffer(bitmap: Bitmap): ByteBuffer {
+        val byteBuffer = ByteBuffer.allocateDirect(modelInputSize)
+        byteBuffer.order(ByteOrder.nativeOrder())
+
+        val pixels = IntArray(inputImageWidth * inputImageHeight)
+        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+
+        for (pixelValue in pixels) {
+            val r = (pixelValue shr 16 and 0xFF)
+            val g = (pixelValue shr 8 and 0xFF)
+            val b = (pixelValue and 0xFF)
+
+            // Convert RGB to grayscale and normalize pixel value to [0..1].
+            val normalizedPixelValue = (r + g + b) / 3.0f / 255.0f
+            byteBuffer.putFloat(normalizedPixelValue)
+        }
+
+        return byteBuffer
+    }*/
+
     //fun detectLane(bitmap: Bitmap): Array<FloatArray> {
+
     @RequiresApi(Build.VERSION_CODES.N)
     fun detectLane(bitmap: Bitmap): FloatArray {
 
-        convertBitmapToByteBuffer(bitmap)
+        //convertBitmapToByteBuffer(bitmap)
 
         val outputMap: MutableMap<Int?, Any?> = HashMap()
 
@@ -304,9 +521,96 @@ class LaneClassifier: Detector {
         return array.toFloatArray()
     }
 
-    companion object{
 
+    @RequiresApi(Build.VERSION_CODES.N)
+    private fun softmax(input: Double, neuronValues: DoubleArray): Double {
+        val total = Arrays.stream(neuronValues).map { v: Double ->
+            Math.exp(
+                v
+            )
+        }.sum()
+        return Math.exp(input) / total
+    }
+
+    /*fun processOutput(imgData: FloatArray)
+    {
+        var processed_output = mutableListOf<Float>()
+        //equivalent of output[:,::1,:] (check later if correct)
+        processed_output.add(imgData[0].toList())
+        val temp_imgData : FloatArray
+        processed_output.add(imgData[1].reverse().toList())              //need to check data type of imgData
+        processed_output.add(imgData[2].toList())
+
+        var prob_processed_output = mutableListOf<Float>()
+        prob_processed_output.add(imgData[0].removeLast().toList())
+        prob_processed_output.add(imgData[1].toList())
+        prob_processed_output.add(imgData[2].toList())
+
+        var prob = softmax(prob_processed_output, 0)   //convert to kotlin
+        //can also try this for softmax
+        var prob_e = mk.math.exp(prob_processed_output)
+        var prob = prob_e / prob_e.sum() // or var prob = prob_e / mk.math.sum(prob_e , axis = 0)
+
+        val griding_num = mk.arange<Int>(1,100,1)                           // create array 1-100
+
+        val idx = griding_num.reshape(-1,1,1)
+        val loc_prob_idx = prob * idx
+        var loc = mk.math.sum<Float>(prob*idx, axis = 0)                  //either this or the one below
+        loc = mk.math.cumSum<Float>(prob*idx, axis = 0)
+
+        processed_output = mk.math.argMax(processed_output, axis = 0)
+
+
+        loc[processed_output == 100] = 0                        //convert to kotlin
+        processed_output = loc
+
+        val col_sample = mk.linspace<Float>(0, 800-1, 100)
+
+        val col_sample_w = col_sample[1] - col_sample[0]
+
+        val max_lanes = processed_output.size()                //convert to kotlin (get processed_output columns)
+        //val max_lanes = processed_output.length()
+        //val lane_num : Float
+
+        for (lane_num in range(max_lanes))
+        {
+            var lane_points = ArrayList<Float>()
+
+            if (mk.math.cumSum(processed_output[:,lane_num]!= 0)>2)
+            {
+                lanes_detected.add(TRUE)
+
+                for(point_num in processed_output[1].size())             //convert to kotlin (get processed_output rows) -> processed_output[0].length()
+                {
+                    if (processed_output[point_num, lane_num] > 0) {
+                        var lane_point_left = (processed_output[point_num, lane_num] * col_sample_w * 1200 / 800).toInt() -1
+                        var lane_point_right = (720 * (tusimple_row_anchor [56 - 1 - point_num] / 288)).toInt() - 1
+                        var lane_point = [lane_point_left,lane_point_right]
+                        lane_points.append(lane_point)
+                    }
+                }
+            }
+            else
+            {
+                lanes_detected.add(FALSE)
+            }
+
+            lane_points_mat.append(lane_points)
+        }
+
+    }
+     */
+
+    companion object {
+
+        private const val TAG = "LaneClassifier"
+
+        private const val FLOAT_TYPE_SIZE = 4
+        private const val PIXEL_SIZE = 1
+
+        private const val OUTPUT_CLASSES_COUNT = 10
         // Number of threads in the java app
+
         val NUM_THREADS = 2
         val isNNAPI = false
         val isGPU = false
@@ -327,7 +631,7 @@ class LaneClassifier: Detector {
             inputWidth: Int,
             inputHeight: Int
         ): LaneClassifier {
-            val d = LaneClassifier()
+            val d = LaneClassifier(AppCompatActivity())
             Log.d("FileName: ", "$modelFilename")
             val actualFilename = labelFilename.split("file:///android_asset/")[1]
             val labelsInput = assetManager.open(actualFilename)
@@ -401,5 +705,6 @@ class LaneClassifier: Detector {
             d.outData!!.order(ByteOrder.nativeOrder())
             return d
         }
+
     }
 }

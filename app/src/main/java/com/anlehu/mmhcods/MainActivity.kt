@@ -3,13 +3,18 @@ package com.anlehu.mmhcods
 import android.app.ActivityManager
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.widget.Button
 import androidx.appcompat.app.AppCompatActivity
+import androidx.constraintlayout.widget.ConstraintLayoutStates.TAG
+import androidx.core.app.ActivityCompat
+import org.opencv.android.OpenCVLoader
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var detector: YoloV5Classifier
     private lateinit var startButton: Button
+    private var laneClassifier = LaneClassifier(this)
+
 
     /**
      * On create function of main activity.
@@ -19,24 +24,38 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        startButton = findViewById(R.id.start_button)
+        if (OpenCVLoader.initDebug()) {
+            Log.d("myTag", "OpenCV loaded")
+        }
+//        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},
+//            123);
+        Log.d(TAG,"lane")
+        /*startButton = findViewById(R.id.start_button)
         startButton.setOnClickListener {
             startActivity(
                 Intent(
                     this@MainActivity,
-                    DetectorActivity::class.java
+                    //LaneClassifier(this)::class.java
+                            DetectorActivity::class.java
                 )
             )
+        }*/
+        startButton = findViewById(R.id.start_button)
+        startButton.setOnClickListener {
+            laneClassifier.initialize()
+            laneClassifier.initializeInterpreter()
+            laneClassifier.imageToBitmap()
+            //laneClassifier.close()
         }
-
+        Log.d(TAG,"classifier")
         //initBox()
 
-        val activityManager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
-        val configurationInfo = activityManager.deviceConfigurationInfo
-
-        System.err.println(configurationInfo.glEsVersion.toDouble())
-        System.err.println(configurationInfo.reqGlEsVersion >= 0x30000)
-        System.err.println(String.format("%X", configurationInfo.reqGlEsVersion))
+//        val activityManager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
+//        val configurationInfo = activityManager.deviceConfigurationInfo
+//
+//        System.err.println(configurationInfo.glEsVersion.toDouble())
+//        System.err.println(configurationInfo.reqGlEsVersion >= 0x30000)
+//        System.err.println(String.format("%X", configurationInfo.reqGlEsVersion))
 
     }
 

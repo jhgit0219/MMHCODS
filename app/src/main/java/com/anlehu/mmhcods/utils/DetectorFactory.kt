@@ -23,23 +23,23 @@ class DetectorFactory {
                 inputSize)
         }
 
-        fun getLaneDetector(assetManager: AssetManager, modelFileName: String): LaneClassifier{
+        /*fun getLaneDetector(assetManager: AssetManager, modelFileName: String): LaneClassifier{
             var labelFileName = ""
             var isQuantized: Boolean = false
-            var inputHeight = 80
-            var inputWidth = 160
+            var inputHeight = 288
+            var inputWidth = 600
 
             if (modelFileName == "lane_detector.tflite") {
                 Log.d("INIT", "INITIALIZE LANE DETECTOR")
-                labelFileName = "file:///android_asset/lane_labels.txt"
+                //labelFileName = "file:///android_asset/lane_labels.txt"
                 isQuantized = false
-                inputWidth = 80
-                inputHeight = 160
+                inputWidth = 288
+                inputHeight = 600
             }
 
-            return LaneClassifier.create(assetManager, modelFileName, labelFileName, isQuantized,
-                inputWidth, inputHeight)
-        }
+           /* return LaneClassifier.create(assetManager, modelFileName, labelFileName, isQuantized,
+                inputWidth, inputHeight)*/
+        }*/
     }
 
 }
