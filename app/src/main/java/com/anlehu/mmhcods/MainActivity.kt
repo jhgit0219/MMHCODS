@@ -13,7 +13,6 @@ import org.opencv.android.OpenCVLoader
 class MainActivity : AppCompatActivity() {
 
     private lateinit var startButton: Button
-    private var laneClassifier = LaneClassifier(this)
 
 
     /**
@@ -23,6 +22,9 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+
+        var laneClassifier = LaneClassifier(this)
 
         if (OpenCVLoader.initDebug()) {
             Log.d("myTag", "OpenCV loaded")
@@ -49,6 +51,8 @@ class MainActivity : AppCompatActivity() {
         }
         Log.d(TAG,"classifier")
         //initBox()
+
+
 
 //        val activityManager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
 //        val configurationInfo = activityManager.deviceConfigurationInfo

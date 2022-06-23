@@ -7,7 +7,7 @@ android {
     compileSdk 31
 
     defaultConfig {
-        applicationId "com.anlehu.mttvrds"
+        applicationId "com.anlehu.mmhcods"
         minSdk 24
         targetSdk 31
         versionCode 1
@@ -57,7 +57,7 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
 
     implementation "org.jetbrains.kotlinx:multik-api:0.1.1"
-    implementation "org.jetbrains.kotlinx:multik-default:0.1.1"
+    implementation "org.jetbrains.kotlinx:multik-jvm:0.1.1"
 
     implementation 'org.tensorflow:tensorflow-lite:2.4.0'
     implementation 'org.tensorflow:tensorflow-lite-gpu:2.4.0'

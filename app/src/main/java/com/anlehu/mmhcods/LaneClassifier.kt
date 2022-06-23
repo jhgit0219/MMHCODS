@@ -20,15 +20,14 @@ import org.opencv.core.Mat
 import org.opencv.core.Size
 import org.opencv.imgcodecs.Imgcodecs
 import org.opencv.imgproc.Imgproc
+import org.opencv.utils.Converters.vector_float_to_Mat
+import org.opencv.utils.Converters.Mat_to_vector_float
+import org.opencv.core.CvType.*
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.Tensor
 import org.tensorflow.lite.gpu.CompatibilityList
 import org.tensorflow.lite.gpu.GpuDelegate
 import org.tensorflow.lite.nnapi.NnApiDelegate
-import java.io.BufferedReader
-import java.io.FileInputStream
-import java.io.IOException
-import java.io.InputStreamReader
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.MappedByteBuffer
@@ -38,11 +37,31 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import android.Manifest.permission.WRITE_EXTERNAL_STORAGE
 import android.os.Environment.getExternalStorageDirectory
+import android.os.storage.OnObbStateChangeListener
+import android.os.storage.OnObbStateChangeListener.ERROR_ALREADY_MOUNTED
+import android.os.storage.OnObbStateChangeListener.MOUNTED
+import android.os.storage.StorageManager
+import org.jetbrains.kotlinx.multik.api.*
+import org.jetbrains.kotlinx.multik.api.math.exp
+import org.jetbrains.kotlinx.multik.ndarray.data.get
+import org.tensorflow.lite.DataType
+import org.tensorflow.lite.TensorFlowLite
+import java.nio.FloatBuffer
+import org.opencv.android.Utils.matToBitmap
+import java.io.*
+import java.lang.Boolean.FALSE
+import java.lang.Boolean.TRUE
+import java.util.stream.IntStream.range
+import kotlin.collections.ArrayList
+import org.jetbrains.kotlinx.multik.api.*
+import org.jetbrains.kotlinx.multik.ndarray.*
+import org.jetbrains.kotlinx.multik.ndarray.data.D3
+import org.jetbrains.kotlinx.multik.ndarray.data.set
+import org.jetbrains.kotlinx.multik.ndarray.operations.*
 
 
-class LaneClassifier(private val context: Context)  : Activity(),  Detector {
+class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
 
-    private lateinit var trackingOverlay: OverlayView
 
 
     val tusimple_row_anchor = arrayOf( 64,  68,  72,  76,  80,  84,  88,  92,  96, 100, 104, 108, 112,
@@ -65,8 +84,31 @@ class LaneClassifier(private val context: Context)  : Activity(),  Detector {
     private val executorService: ExecutorService = Executors.newCachedThreadPool()
 
 
-    var lane_points_mat = ArrayList<Float>()
+    var lane_points_mat = ArrayList<ArrayList<Array<Int>>>()
     var lanes_detected = ArrayList<Boolean>()
+
+    // Add / replace variables here
+    private lateinit var trackingOverlay: OverlayView
+    val context = context
+    val obbPath = this.context.obbDir.absolutePath
+    var mountedPath = ""
+    //val storageManager = StorageManager().mountObb(obbPath)
+    val storageManager = context.getSystemService(Context.STORAGE_SERVICE) as StorageManager
+
+    val mListener = object : OnObbStateChangeListener() {
+        override fun onObbStateChange(path: String, state: Int) {
+            Log.d("HELLO_W", "TEST VALUE $state")
+            if(state == MOUNTED){
+                Log.d("MOUNTED:", "${storageManager.getMountedObbPath(path)}")
+                mountedPath = storageManager.getMountedObbPath(path)
+            }else if (state == ERROR_ALREADY_MOUNTED){
+                Log.d("ALREADY MOUNTED:", path)
+            }else{
+                Log.d("ERROR:", path)
+            }
+        }
+    }
+
 
     // Config values.
     // Pre-allocated buffers.
@@ -94,9 +136,16 @@ class LaneClassifier(private val context: Context)  : Activity(),  Detector {
 //    public fun LaneClassifier()
 //    {
 //    }
+    init{
+        val x = storageManager.unmountObb(obbPath+"/main.1.com.anlehu.mmhcods.obb", true, mListener)
+        Log.d("UNMOUNT: ", "$x")
+        val y = storageManager.mountObb(obbPath+"/main.1.com.anlehu.mmhcods.obb", null, mListener)
+        Log.d("MOUNT: ", "$y")
+    }
 
 
     fun initialize(): Task<Void?> {
+
         val task = TaskCompletionSource<Void?>()
         executorService.execute {
             try {
@@ -106,15 +155,19 @@ class LaneClassifier(private val context: Context)  : Activity(),  Detector {
                 task.setException(e)
             }
         }
+
         return task.task
     }
 
 
     public fun initializeInterpreter(){
 
-        val assetManager = context.assets
-        val model = loadModelFile(assetManager, "model_float32.tflite")
-        val interpreter = Interpreter(model)
+        //val model = loadModelFile(assetManager, "model_float32.tflite")
+        //val model = loadModelFile("model_float32.tflite")
+        val model = loadModelFileLite("model_float32.tflite")
+        Log.d("DEBUG_POINT", "DEBUG_POINT")
+        //val interpreter = Interpreter(model)
+        val interpreter = model
 
         val inputShape = interpreter.getInputTensor(0).shape()
         inputImageWidth = inputShape[1]
@@ -157,7 +210,7 @@ class LaneClassifier(private val context: Context)  : Activity(),  Detector {
 //            Bitmap.Config.ARGB_8888
 //        )
         //val path : String = getExternalStorageDirectory().getAbsolutePath() + "/detected_lanes.png"
-        val imgMat = Imgcodecs.imread("/storage/emulated/0/Download/detected_lanes.jpg")
+        var imgMat = Imgcodecs.imread("/storage/emulated/0/Download/detected_lanes.jpg")
         Imgproc.cvtColor(imgMat, imgMat, Imgproc.COLOR_BGR2RGB)
 //        val tempBitmap : Bitmap
 //        org.opencv.android.Utils.matToBitmap(imgMat,tempBitmap)
@@ -173,6 +226,9 @@ class LaneClassifier(private val context: Context)  : Activity(),  Detector {
 
         // TODO: Add code to run inference with TF Lite.
         // Pre-processing: resize the input image to match the model input shape.
+
+//        var bitmap = Bitmap.createBitmap(mat.width(), mat.height(), Bitmap.Config.ARGB_8888)
+//        matToBitmap(mat,bitmap)
 //        var resizedImage = Bitmap.createScaledBitmap(
 //            bitmap,
 //            inputImageWidth,
@@ -180,17 +236,29 @@ class LaneClassifier(private val context: Context)  : Activity(),  Detector {
 //            true
 //        )
         val imgSize = Size(inputImageWidth.toDouble(), inputImageHeight.toDouble())
-        var resizedImage = Imgproc.resize(mat, mat, imgSize, 0.toDouble(), 0.toDouble(), Imgproc.INTER_AREA)
+        var resizedImage = Imgproc.resize(mat, mat, imgSize)
 
         Log.d("ResizedImage","resized image: "+resizedImage.toString())
         //resizedImage = resizedImage(DataType.FLOAT32)X
-        val bytes = ByteArray(mat.rows() * mat.cols() * mat.channels())
 
-        mat.get(0, 0, bytes)
-        var byteBuffer : ByteBuffer = ByteBuffer.wrap(bytes)
+//        val bytes = FloatArray(mat.rows() * mat.cols() * mat.channels())
+//
+//        mat.convertTo(mat,CV_32FC3)
+//        mat.get(0,0,bytes)
+
+        //var byteBuffer = ByteBuffer.wrap(bytes).asFloatBuffer()
+        //var byteBuffer = FloatBuffer.wrap(bytes)
+
+
+        var bitmap = Bitmap.createBitmap(inputImageWidth, inputImageHeight, Bitmap.Config.ARGB_8888)
+        matToBitmap(mat,bitmap)
+
+        var byteBuffer = convertBitmapToByteBuffer(bitmap)
         Log.d("bytebuffer","bytebuffer: "+byteBuffer.toString())
         //byteBuffer = byteBuffer(DataType.FLOAT32)
         //var floatByteBuffer = byteBuffer(DataType.FLOAT32)
+
+        //val tensorBuffer = TensorBuffer.createFixedSize(byteBuffer, DataType.FLOAT32);
 
 
         // Define an array to store the model output.
@@ -204,7 +272,8 @@ class LaneClassifier(private val context: Context)  : Activity(),  Detector {
         Log.d("output r","output row: "+output.size.toString())
         Log.d("output c","output column: "+output[0].size.toString())
         // Run inference with the input data.
-        interpreter?.run(byteBuffer, output)
+        byteBuffer!!.rewind()
+        interpreter!!?.run(byteBuffer, output)
         Log.d("Output after interpreter","output: "+output.contentDeepToString())
         // Post-processing: find the digit that has the highest probability
         // and return it a human-readable string.
@@ -219,14 +288,15 @@ class LaneClassifier(private val context: Context)  : Activity(),  Detector {
             true
 
         )*/
-        Log.d("Result output","result: "+result.toString())
+        Log.d("Result output","result: "+result.contentDeepToString())
 //        val maxIndex = result.indices.maxByOrNull { result[it] } ?: -1
 //        val resultString =
 //            "Prediction Result: %d\nConfidence: %2f"
 //                .format(maxIndex, result[maxIndex])
 //
 //        Log.d("ResultString","resultString: "+resultString.toString())
-        //return resultString
+//        return resultString
+        processOutput(output)
         return "nice"
     }
 
@@ -390,30 +460,30 @@ class LaneClassifier(private val context: Context)  : Activity(),  Detector {
 
      // Writes Image data into a `ByteBuffer`.
 
-//    private fun convertBitmapToByteBuffer(bitmap: Bitmap): ByteBuffer? {
-//        val byteBuffer = ByteBuffer.allocateDirect(4 * BATCH_SIZE * 288 * 800 * 3)
-//        byteBuffer.order(ByteOrder.nativeOrder())
-//        val intValues = IntArray(288*800)
-//        bitmap.getPixels(intValues, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-//        val pixel = 0
-//        //imgData!!.rewind()
-//        for (i in 0 until INPUT_HEIGHT) {
-//            for (j in 0 until INPUT_WIDTH) {
-//                val pixelValue = intValues[i * INPUT_WIDTH + j]
-//                if (isModelQuantized) {
-//                    // Quantized model
-//                    byteBuffer.put((((pixelValue shr 16 and 0xFF) - IMAGE_MEAN) / IMAGE_STD / inp_scale + inp_zero_point) as Byte)
-//                    byteBuffer.put((((pixelValue shr 8 and 0xFF) - IMAGE_MEAN) / IMAGE_STD / inp_scale + inp_zero_point) as Byte)
-//                    byteBuffer.put((((pixelValue and 0xFF) - IMAGE_MEAN) / IMAGE_STD / inp_scale + inp_zero_point) as Byte)
-//                } else { // Float model
-//                    byteBuffer.putFloat(((pixelValue shr 16 and 0xFF) - IMAGE_MEAN) / IMAGE_STD)
-//                    byteBuffer.putFloat(((pixelValue shr 8 and 0xFF) - IMAGE_MEAN) / IMAGE_STD)
-//                    byteBuffer.putFloat(((pixelValue and 0xFF) - IMAGE_MEAN) / IMAGE_STD)
-//                }
-//            }
-//        }
-//        return byteBuffer
-//    }
+    private fun convertBitmapToByteBuffer(bitmap: Bitmap?): ByteBuffer? {
+        val byteBuffer = ByteBuffer.allocateDirect(4 * BATCH_SIZE * 288 * 800 * 3)
+        byteBuffer.order(ByteOrder.nativeOrder())
+        val intValues = IntArray(288*800)
+        bitmap!!.getPixels(intValues, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+        val pixel = 0
+        //imgData!!.rewind()
+        for (i in 0 until INPUT_HEIGHT) {
+            for (j in 0 until INPUT_WIDTH) {
+                val pixelValue = intValues[i * INPUT_WIDTH + j]
+                if (isModelQuantized) {
+                    // Quantized model
+                    byteBuffer.put((((pixelValue shr 16 and 0xFF) - IMAGE_MEAN) / IMAGE_STD / inp_scale + inp_zero_point) as Byte)
+                    byteBuffer.put((((pixelValue shr 8 and 0xFF) - IMAGE_MEAN) / IMAGE_STD / inp_scale + inp_zero_point) as Byte)
+                    byteBuffer.put((((pixelValue and 0xFF) - IMAGE_MEAN) / IMAGE_STD / inp_scale + inp_zero_point) as Byte)
+                } else { // Float model
+                    byteBuffer.putFloat(((pixelValue shr 16 and 0xFF) - IMAGE_MEAN) / IMAGE_STD)
+                    byteBuffer.putFloat(((pixelValue shr 8 and 0xFF) - IMAGE_MEAN) / IMAGE_STD)
+                    byteBuffer.putFloat(((pixelValue and 0xFF) - IMAGE_MEAN) / IMAGE_STD)
+                }
+            }
+        }
+        return byteBuffer
+    }
 
 
     /*private fun convertBitmapToByteBuffer(bitmap: Bitmap): ByteBuffer {
@@ -532,61 +602,156 @@ class LaneClassifier(private val context: Context)  : Activity(),  Detector {
         return Math.exp(input) / total
     }
 
-    /*fun processOutput(imgData: FloatArray)
+
+    fun processOutput(imgData: Array<Array<Array<FloatArray>>>)
     {
-        var processed_output = mutableListOf<Float>()
-        //equivalent of output[:,::1,:] (check later if correct)
-        processed_output.add(imgData[0].toList())
-        val temp_imgData : FloatArray
-        processed_output.add(imgData[1].reverse().toList())              //need to check data type of imgData
-        processed_output.add(imgData[2].toList())
 
-        var prob_processed_output = mutableListOf<Float>()
-        prob_processed_output.add(imgData[0].removeLast().toList())
-        prob_processed_output.add(imgData[1].toList())
-        prob_processed_output.add(imgData[2].toList())
+        var processed_output = mutableListOf<MutableList<MutableList<Float>>>()
 
-        var prob = softmax(prob_processed_output, 0)   //convert to kotlin
+        for(i in 0..100){
+            processed_output.add(mutableListOf())  // Add a mutableList at index i
+            for(j in 55 downTo 0){
+                processed_output[i].add(imgData[0][i][j].toMutableList()) // add the last element of the 2nd dimension
+                // as the 1st element of every 1st dimension
+                // list
+            }
+        }
+
+        var processed_output_ndarry = mk.ndarray(processed_output)
+
+        Log.d("Processed Output","processed_output: "+processed_output.toString())
+        Log.d("Processed Output NDarry","processed_output_ndarry: "+processed_output_ndarry.toString())
+
+        //(processed_output[:-1, :, :]
+
+        var prob_processed_output = mutableListOf<MutableList<MutableList<Float>>>()
+
+        for(i in 0..99)
+        {
+            prob_processed_output.add(mutableListOf())
+            for(j in 0 .. 55)
+            {
+                prob_processed_output[i].add(imgData[0][i][j].toMutableList())
+            }
+        }
+
+        var prob_processed_output_ndarry = mk.ndarray(prob_processed_output)
+
+        Log.d("Prob Processed Output","prob_processed_output: "+prob_processed_output.toString())
+        Log.d("Prob Processed Output NDarry","prob_processed_output_ndarry: "+prob_processed_output_ndarry.toString())
+
+        //var prob = softmax(prob_processed_output, 0)   //convert to kotlin
         //can also try this for softmax
-        var prob_e = mk.math.exp(prob_processed_output)
-        var prob = prob_e / prob_e.sum() // or var prob = prob_e / mk.math.sum(prob_e , axis = 0)
+        var prob_e = mk.math.exp(prob_processed_output_ndarry)
 
-        val griding_num = mk.arange<Int>(1,100,1)                           // create array 1-100
+        Log.d("Prob Exp","prob_e: "+prob_e.toString())
 
-        val idx = griding_num.reshape(-1,1,1)
-        val loc_prob_idx = prob * idx
-        var loc = mk.math.sum<Float>(prob*idx, axis = 0)                  //either this or the one below
-        loc = mk.math.cumSum<Float>(prob*idx, axis = 0)
+        //var prob = prob_e / mk.math.sum(prob_e , axis = 0)      //var prob = prob_e / prob_e.sum() // or
+        var prob = prob_e / mk.math.sum(prob_e)
 
-        processed_output = mk.math.argMax(processed_output, axis = 0)
+        Log.d("Prob","prob: "+prob.toString())
+
+        val griding_num = mk.arange<Int>(1,101,1)                           // create array 1-100
+
+        Log.d("Griding Number","griding_num: "+griding_num.toString())
+
+        val idx = griding_num.reshape(griding_num.shape[0],1,1)
+        Log.d("IDX","idx: "+idx.toString())
+
+        //var loc_prob_idx = prob.asD3Array() * idx.asType<Float>()
 
 
-        loc[processed_output == 100] = 0                        //convert to kotlin
-        processed_output = loc
+        //need to fix append (not sure why it is not working)
+        var loc_prob_idx = mk.zeros<Float>(prob.shape[0],prob.shape[1],prob.shape[2])
+
+        for(i in 0..(prob.shape[0]-1)) {
+            for (j in 0..(prob.shape[1] - 1)) {
+                for (k in 0..(prob.shape[2] - 1)) {
+                    loc_prob_idx[i].append((prob[i][j][k] * idx[i][0][0]))
+                }
+            }
+        }
+
+
+//        var loc_prob_idx = mutableListOf<MutableList<MutableList<Float>>>()
+//        for(i in 0..(prob.shape[0]-1))
+//        {
+//            loc_prob_idx.add(mutableListOf())
+//            for (j in 0..(prob.shape[1]-1))
+//            {
+//                loc_prob_idx.add(mutableListOf())
+//                for(k in 0..(prob.shape[2]-1))
+//                {
+//                    loc_prob_idx[i].add((prob[i][j][k] * idx[i][0][0]))
+//                }
+//            }
+//
+//        }
+//        var loc_prob_idx_ndarry = mk.ndarray(loc_prob_idx)
+
+
+        Log.d("Loc_prob_idx","loc_prob_idx: "+loc_prob_idx.toString())
+        var loc = mk.math.sumD3(loc_prob_idx, axis = 0)                  //either this or the one below
+        //loc = mk.math.cumSum(loc_prob_idx, axis = 0)
+
+
+        Log.d("Loc","loc: "+loc.toString())
+
+        //processed_output_ndarry = mk.math.argMax(processed_output_ndarry.asD3Array(), axis = 0)
+        var argMax_process_output = mk.math.argMaxD3(processed_output_ndarry.asD3Array(), axis = 0)
+
+        Log.d("argMax","argMax: "+argMax_process_output.toString())
+
+        //loc[argMax_process_output == 100] = 0                        //convert to kotlin
+
+        //need to fix append (not sure why it is not working)
+        val argMaxSize = argMax_process_output.shape[0]
+        val argMaxHeight = argMax_process_output.shape[1]
+        for (i in 0..(argMaxSize-1))
+            for(j in 0..(argMaxHeight-1))
+                if(argMax_process_output[i][j].toFloat() != 100F)
+                {
+                    loc[i].append(argMax_process_output[i][j].toFloat())
+                }
+                else
+                {
+                    loc[i].append(0F)
+                }
+
+        val loc_processed_output = loc
+
+        Log.d("Loc Processed Output","loc_processed_output: "+loc_processed_output.toString())
 
         val col_sample = mk.linspace<Float>(0, 800-1, 100)
 
+        Log.d("Col Sample","col_sample: "+col_sample.toString())
+
         val col_sample_w = col_sample[1] - col_sample[0]
 
-        val max_lanes = processed_output.size()                //convert to kotlin (get processed_output columns)
+        Log.d("Col Sample W","col_sample_w: "+col_sample_w.toString())
+
+        var max_lanes = loc_processed_output.shape[1]                //convert to kotlin (get processed_output columns)
+        //temporary
+        Log.d("Max Lanes","max_lanes: "+max_lanes.toString())
         //val max_lanes = processed_output.length()
         //val lane_num : Float
 
-        for (lane_num in range(max_lanes))
-        {
-            var lane_points = ArrayList<Float>()
 
-            if (mk.math.cumSum(processed_output[:,lane_num]!= 0)>2)
+        for (lane_num in 0..(max_lanes-1))
+        {
+            var lane_points = ArrayList<Array<Int>>()
+                                            //need to be convert this to kotlin
+            if (mk.math.sum(loc_processed_output[:,lane_num]!= 0)>2) //convert to kotlin
             {
                 lanes_detected.add(TRUE)
 
-                for(point_num in processed_output[1].size())             //convert to kotlin (get processed_output rows) -> processed_output[0].length()
+                for(point_num in 0..(loc_processed_output.shape[1]-1))             //convert to kotlin (get processed_output rows) -> processed_output[0].length()
                 {
-                    if (processed_output[point_num, lane_num] > 0) {
-                        var lane_point_left = (processed_output[point_num, lane_num] * col_sample_w * 1200 / 800).toInt() -1
-                        var lane_point_right = (720 * (tusimple_row_anchor [56 - 1 - point_num] / 288)).toInt() - 1
-                        var lane_point = [lane_point_left,lane_point_right]
-                        lane_points.append(lane_point)
+                    if (loc_processed_output[point_num,lane_num] > 0) {
+                        var lane_point_left = (loc_processed_output[point_num,lane_num] * col_sample_w * 1200 / 800).toInt() -1
+                        var lane_point_right = (720 * (tusimple_row_anchor [55-point_num] / 288)).toInt() - 1
+                        var lane_point = arrayOf(lane_point_left,lane_point_right)
+                        lane_points.add(lane_point)
                     }
                 }
             }
@@ -595,11 +760,10 @@ class LaneClassifier(private val context: Context)  : Activity(),  Detector {
                 lanes_detected.add(FALSE)
             }
 
-            lane_points_mat.append(lane_points)
+            lane_points_mat.add(lane_points)
         }
 
     }
-     */
 
     companion object {
 
@@ -706,5 +870,10 @@ class LaneClassifier(private val context: Context)  : Activity(),  Detector {
             return d
         }
 
+    }
+
+    @Throws(IOException::class)
+    fun loadModelFileLite(filename: String): Interpreter{
+        return Interpreter(File("$mountedPath/$filename"))
     }
 }
