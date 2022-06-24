@@ -82,7 +82,7 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
     private val executorService: ExecutorService = Executors.newCachedThreadPool()
 
 
-    var lane_points_mat = ArrayList<ArrayList<Array<Int>>>()
+    var lane_points_mat = ArrayList<ArrayList<ArrayList<Int>>>()
     var lanes_detected = ArrayList<Boolean>()
 
     // Add / replace variables here
@@ -673,19 +673,20 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
 
 
         var loc_prob_idx = mutableListOf<MutableList<MutableList<Float>>>()
-        for(i in 0..(prob.shape[0]-1))
+        for(i in 0 until prob.shape[0])
         {
             loc_prob_idx.add(mutableListOf())
-            for (j in 0..(prob.shape[1]-1))
+            for (j in 0 until prob.shape[1])
             {
-                loc_prob_idx.add(mutableListOf<MutableList<Float>>())
-                for(k in 0..(prob.shape[2]-1))
+                loc_prob_idx[i].add(mutableListOf())
+
+                for(k in 0 until prob.shape[2])
                 {
-                    loc_prob_idx[0][0].add((prob[i][j][k] * idx[i][0][0]))
+                    loc_prob_idx[i][j].add((prob[i][j][k] * idx[i][0][0]))
                 }
             }
-
         }
+
         var loc_prob_idx_ndarray = mk.ndarray(loc_prob_idx)
 
 
@@ -705,20 +706,41 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
         //loc[argMax_process_output == 100] = 0                        //convert to kotlin
 
         //need to fix append (not sure why it is not working)
-        val argMaxSize = argMax_process_output.shape[0]
-        val argMaxHeight = argMax_process_output.shape[1]
-        for (i in 0..(argMaxSize-1))
-            for(j in 0..(argMaxHeight-1))
+//        val argMaxSize = argMax_process_output.shape[0]
+//        val argMaxHeight = argMax_process_output.shape[1]
+//        for (i in 0..(argMaxSize-1))
+//            for(j in 0..(argMaxHeight-1))
+//                if(argMax_process_output[i][j].toFloat() != 100F)
+//                {
+//                    loc[i].append(argMax_process_output[i][j].toFloat())
+//                }
+//                else
+//                {
+//                    loc[i].append(0F)
+//                }
+
+        var loc_Argmax = mutableListOf<MutableList<MutableList<Float>>>()
+
+        for(i in 0..(argMax_process_output.shape[0]-1))
+        {
+            loc_Argmax.add(mutableListOf())
+            for(j in 0..(argMax_process_output.shape[1]-1))
+            {
+                loc_Argmax[i].add(mutableListOf())
                 if(argMax_process_output[i][j].toFloat() != 100F)
                 {
-                    loc[i].append(argMax_process_output[i][j].toFloat())
+                    loc_Argmax[i][j].add(argMax_process_output[i][j].toFloat())
                 }
                 else
                 {
-                    loc[i].append(0F)
+                    loc_Argmax[i][j].add(0F)
                 }
+            }
+        }
 
-        val loc_processed_output = loc
+        var loc_Argmax_ndarray = mk.ndarray(loc_Argmax)
+
+        val loc_processed_output = loc_Argmax_ndarray
 
         Log.d("Loc Processed Output","loc_processed_output: "+loc_processed_output.toString())
 
@@ -739,28 +761,46 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
 
         for (lane_num in 0..(max_lanes-1))
         {
-            var lane_points = ArrayList<Array<Int>>()
+            var lane_points = ArrayList<ArrayList<Int>>()
 
             var sumLocPO = mutableListOf<MutableList<Float>>()
-
-            sumLocPO.add(mutableListOf())
             for(i in 0..(loc_processed_output.shape[0]-1))
             {
-                sumLocPO[0].add(loc_processed_output[i][lane_num])
+                sumLocPO.add(mutableListOf())
+                sumLocPO[i] = loc_processed_output[i][lane_num].toMutableList()
+               // sumLocPO[i].add(loc_processed_output[0][i][lane_num])
+
+//                Log.d("loc_processed_output[0][i][lane_num]",
+//                    "loc_processed_output[0][i][lane_num]: "
+//                            +loc_processed_output[0][i][lane_num].toString())
             }
 
             var sumLocPO_ndarray = mk.ndarray(sumLocPO)
             Log.d("Ndarray for Loc_PO sum","sumLocPO_ndarray: "+sumLocPO_ndarray.toString())
+            Log.d("Loc_proc_out","loc_proc_out: "+loc_processed_output.shape[0].toString())
+            Log.d("Loc_proc_out","loc_proc_out: "+loc_processed_output.shape[1].toString())
+            Log.d("Loc_proc_out","loc_proc_out: "+loc_processed_output.shape[2].toString())
             //if (mk.math.sum(loc_processed_output[:,lane_num]!= 0)>2) //convert to kotlin
             if (mk.math.sum(sumLocPO_ndarray)>2)
             {
                 lanes_detected.add(TRUE)
-                for(point_num in 0..(loc_processed_output.shape[1]-1))             //convert to kotlin (get processed_output rows) -> processed_output[0].length()
+                for(point_num in 0..(loc_processed_output.shape[0]-1))             //convert to kotlin (get processed_output rows) -> processed_output[0].length()
                 {
-                    if (loc_processed_output[point_num,lane_num] > 0) {
-                        var lane_point_left = (loc_processed_output[point_num,lane_num] * col_sample_w * 1200 / 800).toInt() -1
-                        var lane_point_right = (720 * (tusimple_row_anchor [55-point_num] / 288)).toInt() - 1
-                        var lane_point = arrayOf(lane_point_left,lane_point_right)
+                    var thispoint = loc_processed_output[point_num,lane_num]
+                    Log.d("Loc Processed Output","loc_processed_output: "+loc_processed_output[point_num][lane_num][0].toString())
+                    if (loc_processed_output[point_num][lane_num][0] > 0F) {
+                        var lane_point_left = (loc_processed_output[point_num,lane_num,0] * col_sample_w * 1200 / 800).toInt() -1
+                        Log.d("Lane point left","lane_point_left: "+lane_point_left.toString())
+
+
+//                        Log.d("tusimple_row_anchor1","tusimple_row_anchor1: "+(tusimple_row_anchor[55-point_num]/288).toString())
+//                        Log.d("tusimple_row_anchor2","tusimple_row_anchor2: "+((tusimple_row_anchor[55-point_num]/288)*720).toString())
+                        var lane_point_right = (720 * (tusimple_row_anchor[55-point_num].toFloat() / 288)).toInt() - 1
+                        Log.d("Lane point right","lane_point_right: "+lane_point_right.toString())
+
+
+                        var lane_point = arrayListOf(lane_point_left,lane_point_right)
+                        Log.d("Lane point","lane_point: "+lane_point.toString())
                         lane_points.add(lane_point)
                     }
                 }
@@ -773,6 +813,24 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
             lane_points_mat.add(lane_points)
         }
 
+        Log.d("Lane Detected","Lane_detected: "+lanes_detected.toString())
+
+        if(lanes_detected[0])
+        {
+            Log.d("Lane POINTS Lane0","Lane_points_mat: "+lane_points_mat[0].toString())
+        }
+        if(lanes_detected[1])
+        {
+            Log.d("Lane POINTS Lane1","Lane_points_mat: "+lane_points_mat[1].toString())
+        }
+        if(lanes_detected[2])
+        {
+            Log.d("Lane POINTS Lane2","Lane_points_mat: "+lane_points_mat[2].toString())
+        }
+        if(lanes_detected[3])
+        {
+            Log.d("Lane POINTS Lane3","Lane_points_mat: "+lane_points_mat[3].toString())
+        }
     }
 
     companion object {
