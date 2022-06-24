@@ -43,7 +43,6 @@ import android.os.storage.OnObbStateChangeListener.MOUNTED
 import android.os.storage.StorageManager
 import org.jetbrains.kotlinx.multik.api.*
 import org.jetbrains.kotlinx.multik.api.math.exp
-import org.jetbrains.kotlinx.multik.ndarray.data.get
 import org.tensorflow.lite.DataType
 import org.tensorflow.lite.TensorFlowLite
 import java.nio.FloatBuffer
@@ -55,8 +54,7 @@ import java.util.stream.IntStream.range
 import kotlin.collections.ArrayList
 import org.jetbrains.kotlinx.multik.api.*
 import org.jetbrains.kotlinx.multik.ndarray.*
-import org.jetbrains.kotlinx.multik.ndarray.data.D3
-import org.jetbrains.kotlinx.multik.ndarray.data.set
+import org.jetbrains.kotlinx.multik.ndarray.data.*
 import org.jetbrains.kotlinx.multik.ndarray.operations.*
 
 
@@ -662,36 +660,38 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
 
 
         //need to fix append (not sure why it is not working)
-        var loc_prob_idx = mk.zeros<Float>(prob.shape[0],prob.shape[1],prob.shape[2])
-
-        for(i in 0..(prob.shape[0]-1)) {
-            for (j in 0..(prob.shape[1] - 1)) {
-                for (k in 0..(prob.shape[2] - 1)) {
-                    loc_prob_idx[i].append((prob[i][j][k] * idx[i][0][0]))
-                }
-            }
-        }
-
-
-//        var loc_prob_idx = mutableListOf<MutableList<MutableList<Float>>>()
-//        for(i in 0..(prob.shape[0]-1))
-//        {
-//            loc_prob_idx.add(mutableListOf())
-//            for (j in 0..(prob.shape[1]-1))
-//            {
-//                loc_prob_idx.add(mutableListOf())
-//                for(k in 0..(prob.shape[2]-1))
-//                {
-//                    loc_prob_idx[i].add((prob[i][j][k] * idx[i][0][0]))
+//        var loc_prob_idx = mk.zeros<Float>(prob.shape[0],prob.shape[1],prob.shape[2])
+//
+//        for(i in 0..(prob.shape[0]-1)) {
+//            for (j in 0..(prob.shape[1] - 1)) {
+//                for (k in 0..(prob.shape[2] - 1)) {
+//                    Log.d("PROB*IDX","prob*idx: "+(prob[i][j][k] * idx[i][0][0]).toString())
+//                    loc_prob_idx[i].append((prob[i][j][k] * idx[i][0][0]))
 //                }
 //            }
-//
 //        }
-//        var loc_prob_idx_ndarry = mk.ndarray(loc_prob_idx)
+
+
+        var loc_prob_idx = mutableListOf<MutableList<MutableList<Float>>>()
+        for(i in 0..(prob.shape[0]-1))
+        {
+            loc_prob_idx.add(mutableListOf())
+            for (j in 0..(prob.shape[1]-1))
+            {
+                loc_prob_idx.add(mutableListOf<MutableList<Float>>())
+                for(k in 0..(prob.shape[2]-1))
+                {
+                    loc_prob_idx[0][0].add((prob[i][j][k] * idx[i][0][0]))
+                }
+            }
+
+        }
+        var loc_prob_idx_ndarray = mk.ndarray(loc_prob_idx)
 
 
         Log.d("Loc_prob_idx","loc_prob_idx: "+loc_prob_idx.toString())
-        var loc = mk.math.sumD3(loc_prob_idx, axis = 0)                  //either this or the one below
+        Log.d("Loc_prob_idx_ndarray","loc_prob_idx_ndarray: "+loc_prob_idx_ndarray.toString())
+        var loc = mk.math.sumD3(loc_prob_idx_ndarray, axis = 0)                  //either this or the one below
         //loc = mk.math.cumSum(loc_prob_idx, axis = 0)
 
 
@@ -740,11 +740,21 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
         for (lane_num in 0..(max_lanes-1))
         {
             var lane_points = ArrayList<Array<Int>>()
-                                            //need to be convert this to kotlin
-            if (mk.math.sum(loc_processed_output[:,lane_num]!= 0)>2) //convert to kotlin
+
+            var sumLocPO = mutableListOf<MutableList<Float>>()
+
+            sumLocPO.add(mutableListOf())
+            for(i in 0..(loc_processed_output.shape[0]-1))
+            {
+                sumLocPO[0].add(loc_processed_output[i][lane_num])
+            }
+
+            var sumLocPO_ndarray = mk.ndarray(sumLocPO)
+            Log.d("Ndarray for Loc_PO sum","sumLocPO_ndarray: "+sumLocPO_ndarray.toString())
+            //if (mk.math.sum(loc_processed_output[:,lane_num]!= 0)>2) //convert to kotlin
+            if (mk.math.sum(sumLocPO_ndarray)>2)
             {
                 lanes_detected.add(TRUE)
-
                 for(point_num in 0..(loc_processed_output.shape[1]-1))             //convert to kotlin (get processed_output rows) -> processed_output[0].length()
                 {
                     if (loc_processed_output[point_num,lane_num] > 0) {
