@@ -1,11 +1,12 @@
 package com.anlehu.mmhcods
 
-import android.app.Activity
 import android.content.Context
 import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.graphics.RectF
 import android.os.Build
+import android.os.storage.OnObbStateChangeListener
+import android.os.storage.StorageManager
 import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
@@ -15,47 +16,48 @@ import com.anlehu.mmhcods.utils.Utils
 import com.anlehu.mmhcods.views.OverlayView
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.TaskCompletionSource
-import org.checkerframework.checker.units.qual.m
+import org.jetbrains.kotlinx.multik.api.arange
+import org.jetbrains.kotlinx.multik.api.linspace
+import org.jetbrains.kotlinx.multik.api.math.exp
+import org.jetbrains.kotlinx.multik.api.mk
+import org.jetbrains.kotlinx.multik.api.ndarray
+import org.jetbrains.kotlinx.multik.ndarray.data.get
+import org.jetbrains.kotlinx.multik.ndarray.operations.div
+import org.jetbrains.kotlinx.multik.ndarray.operations.toMutableList
+import org.opencv.android.Utils.matToBitmap
 import org.opencv.core.Mat
 import org.opencv.core.Size
 import org.opencv.imgcodecs.Imgcodecs
 import org.opencv.imgproc.Imgproc
-import org.opencv.utils.Converters.vector_float_to_Mat
-import org.opencv.utils.Converters.Mat_to_vector_float
-import org.opencv.core.CvType.*
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.Tensor
 import org.tensorflow.lite.gpu.CompatibilityList
 import org.tensorflow.lite.gpu.GpuDelegate
 import org.tensorflow.lite.nnapi.NnApiDelegate
+import java.io.BufferedReader
+import java.io.IOException
+import java.io.InputStreamReader
+import java.lang.Boolean.FALSE
+import java.lang.Boolean.TRUE
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.MappedByteBuffer
-import java.nio.channels.FileChannel
 import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import android.Manifest.permission.WRITE_EXTERNAL_STORAGE
-import android.os.Environment.getExternalStorageDirectory
-import android.os.storage.OnObbStateChangeListener
-import android.os.storage.OnObbStateChangeListener.ERROR_ALREADY_MOUNTED
-import android.os.storage.OnObbStateChangeListener.MOUNTED
-import android.os.storage.StorageManager
-import org.jetbrains.kotlinx.multik.api.*
-import org.jetbrains.kotlinx.multik.api.math.exp
-import org.tensorflow.lite.DataType
-import org.tensorflow.lite.TensorFlowLite
-import java.nio.FloatBuffer
-import org.opencv.android.Utils.matToBitmap
-import java.io.*
-import java.lang.Boolean.FALSE
-import java.lang.Boolean.TRUE
-import java.util.stream.IntStream.range
 import kotlin.collections.ArrayList
-import org.jetbrains.kotlinx.multik.api.*
-import org.jetbrains.kotlinx.multik.ndarray.*
-import org.jetbrains.kotlinx.multik.ndarray.data.*
-import org.jetbrains.kotlinx.multik.ndarray.operations.*
+import kotlin.collections.HashMap
+import kotlin.collections.List
+import kotlin.collections.MutableList
+import kotlin.collections.MutableMap
+import kotlin.collections.arrayListOf
+import kotlin.collections.contentDeepToString
+import kotlin.collections.indices
+import kotlin.collections.mutableListOf
+import kotlin.collections.set
+import kotlin.collections.toFloatArray
+import kotlin.collections.toList
+import kotlin.collections.toMutableList
 
 
 class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
@@ -81,6 +83,31 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
 
     private val executorService: ExecutorService = Executors.newCachedThreadPool()
 
+    // Float model
+    private val IMAGE_MEAN = 0f
+
+    private val IMAGE_STD = 255.0f
+
+    //config lane detector
+    var INPUT_WIDTH: Int = -1
+    var INPUT_HEIGHT: Int = -1
+
+    private var output_box = 0
+
+
+    private var isModelQuantized = false
+
+    /** holds a gpu delegate  */
+    var gpuDelegate: GpuDelegate? = null
+
+    /** holds an nnapi delegate  */
+    var nnapiDelegate: NnApiDelegate? = null
+
+    /** The loaded TensorFlow Lite model.  */
+    private var tfliteModel: MappedByteBuffer? = null
+
+    /** Options for configuring the Interpreter.  */
+    private val tfliteOptions: Interpreter.Options = Interpreter.Options()
 
     var lane_points_mat = ArrayList<ArrayList<ArrayList<Int>>>()
     var lanes_detected = ArrayList<Boolean>()
@@ -135,10 +162,21 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
 //    {
 //    }
     init{
+
         val x = storageManager.unmountObb(obbPath+"/main.1.com.anlehu.mmhcods.obb", true, mListener)
         Log.d("UNMOUNT: ", "$x")
         val y = storageManager.mountObb(obbPath+"/main.1.com.anlehu.mmhcods.obb", null, mListener)
         Log.d("MOUNT: ", "$y")
+
+        try{
+            this.tfliteOptions.apply{
+                this.addDelegate(GpuDelegate(CompatibilityList().bestOptionsForThisDevice))
+            }
+        }catch(e: Exception){
+            Log.e("TFLITE_ERROR", e.toString())
+        }
+
+
     }
 
 
@@ -148,6 +186,7 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
         executorService.execute {
             try {
                 initializeInterpreter()
+                imageToBitmap()
                 task.setResult(null)
             } catch (e: IOException) {
                 task.setException(e)
@@ -158,16 +197,21 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
     }
 
 
-    public fun initializeInterpreter(){
+    fun initializeInterpreter(){
 
         //val model = loadModelFile(assetManager, "model_float32.tflite")
         //val model = loadModelFile("model_float32.tflite")
-        val model = loadModelFileLite("model_float32.tflite")
-        Log.d("DEBUG_POINT", "DEBUG_POINT")
-        //val interpreter = Interpreter(model)
-        val interpreter = model
+        //this.interpreter = loadModelFileLite("model_float32.tflite")
 
-        val inputShape = interpreter.getInputTensor(0).shape()
+        //val interpreter = Interpreter(model)
+        Log.d("tflite", "${mountedPath}/model_float32.tflite")
+        this.tfliteModel = Utils.loadModelFile(this.context.assets,"${mountedPath}/model_float32.tflite")
+        this.tfLite = Interpreter(tfliteModel!!, tfliteOptions)
+        // Finish interpreter initialization.
+        isInitialized = true
+        Log.d(TAG, "Initialized TFLite interpreter.")
+
+        val inputShape = tfLite!!.getInputTensor(0).shape()
         inputImageWidth = inputShape[1]
         inputImageHeight = inputShape[2]
         Log.d("INTPUTIMAGEWIDTH","INTPUTIMAGEWIDTH"+inputImageWidth.toString())
@@ -175,28 +219,13 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
         modelInputSize = FLOAT_TYPE_SIZE * inputImageWidth *
                 inputImageHeight * PIXEL_SIZE
 
-        val outputShape = interpreter.getOutputTensor(0).shape()
+        val outputShape = tfLite!!.getOutputTensor(0).shape()
         outputImageWidth = outputShape[1]
         outputImageHeight = outputShape[2]
         modelOutputSize = FLOAT_TYPE_SIZE * outputImageWidth *
                 outputImageHeight * PIXEL_SIZE
-        // Finish interpreter initialization.
-        this.interpreter = interpreter
-        isInitialized = true
-        Log.d(TAG, "Initialized TFLite interpreter.")
 
-    }
-
-
-
-    @Throws(IOException::class)
-    public fun loadModelFile(assetManager: AssetManager, filename: String): ByteBuffer {
-        val fileDescriptor = assetManager.openFd(filename)
-        val inputStream = FileInputStream(fileDescriptor.fileDescriptor)
-        val fileChannel = inputStream.channel
-        val startOffset = fileDescriptor.startOffset
-        val declaredLength = fileDescriptor.declaredLength
-        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
+        Log.d("DEBUG_POINT", "DEBUG_POINT")
     }
 
     fun imageToBitmap() {
@@ -219,7 +248,7 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
 
     }
 
-    public fun classify(mat: Mat): String {
+    fun classify(mat: Mat): String {
         check(isInitialized) { "TF Lite Interpreter is not initialized yet." }
 
         // TODO: Add code to run inference with TF Lite.
@@ -258,7 +287,6 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
 
         //val tensorBuffer = TensorBuffer.createFixedSize(byteBuffer, DataType.FLOAT32);
 
-
         // Define an array to store the model output.
         val output = Array(1) {
             Array(101) {
@@ -271,7 +299,7 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
         Log.d("output c","output column: "+output[0].size.toString())
         // Run inference with the input data.
         byteBuffer!!.rewind()
-        interpreter!!?.run(byteBuffer, output)
+        tfLite!!.run(byteBuffer, output)
         Log.d("Output after interpreter","output: "+output.contentDeepToString())
         // Post-processing: find the digit that has the highest probability
         // and return it a human-readable string.
@@ -313,7 +341,7 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
 
     override fun close() {
         executorService.execute {
-            interpreter?.close()
+            tfLite?.close()
             Log.d(TAG, "Closed TFLite interpreter.")
         }
     }
@@ -354,34 +382,6 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
     override fun getObjThresh(): Float {
         return MainActivity.MINIMUM_CONFIDENCE
     }
-
-    // Float model
-    private val IMAGE_MEAN = 0f
-
-    private val IMAGE_STD = 255.0f
-
-    //config lane detector
-    var INPUT_WIDTH: Int = -1
-    var INPUT_HEIGHT: Int = -1
-
-    private var output_box = 0
-
-
-    private var isModelQuantized = false
-
-    /** holds a gpu delegate  */
-    var gpuDelegate: GpuDelegate? = null
-
-    /** holds an nnapi delegate  */
-    var nnapiDelegate: NnApiDelegate? = null
-
-    /** The loaded TensorFlow Lite model.  */
-    private var tfliteModel: MappedByteBuffer? = null
-
-    /** Options for configuring the Interpreter.  */
-    private val tfliteOptions: Interpreter.Options = Interpreter.Options()
-
-
 
     //non maximum suppression
     @RequiresApi(Build.VERSION_CODES.N)
@@ -635,26 +635,26 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
 
         var prob_processed_output_ndarry = mk.ndarray(prob_processed_output)
 
-        Log.d("Prob Processed Output","prob_processed_output: "+prob_processed_output.toString())
-        Log.d("Prob Processed Output NDarry","prob_processed_output_ndarry: "+prob_processed_output_ndarry.toString())
+//        Log.d("Prob Processed Output","prob_processed_output: "+prob_processed_output.toString())
+//        Log.d("Prob Processed Output NDarry","prob_processed_output_ndarry: "+prob_processed_output_ndarry.toString())
 
         //var prob = softmax(prob_processed_output, 0)   //convert to kotlin
         //can also try this for softmax
         var prob_e = mk.math.exp(prob_processed_output_ndarry)
 
-        Log.d("Prob Exp","prob_e: "+prob_e.toString())
+//        Log.d("Prob Exp","prob_e: "+prob_e.toString())
 
         //var prob = prob_e / mk.math.sum(prob_e , axis = 0)      //var prob = prob_e / prob_e.sum() // or
         var prob = prob_e / mk.math.sum(prob_e)
 
-        Log.d("Prob","prob: "+prob.toString())
+//        Log.d("Prob","prob: "+prob.toString())
 
         val griding_num = mk.arange<Int>(1,101,1)                           // create array 1-100
 
-        Log.d("Griding Number","griding_num: "+griding_num.toString())
+//        Log.d("Griding Number","griding_num: "+griding_num.toString())
 
         val idx = griding_num.reshape(griding_num.shape[0],1,1)
-        Log.d("IDX","idx: "+idx.toString())
+//        Log.d("IDX","idx: "+idx.toString())
 
         //var loc_prob_idx = prob.asD3Array() * idx.asType<Float>()
 
@@ -690,13 +690,13 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
         var loc_prob_idx_ndarray = mk.ndarray(loc_prob_idx)
 
 
-        Log.d("Loc_prob_idx","loc_prob_idx: "+loc_prob_idx.toString())
-        Log.d("Loc_prob_idx_ndarray","loc_prob_idx_ndarray: "+loc_prob_idx_ndarray.toString())
+//        Log.d("Loc_prob_idx","loc_prob_idx: "+loc_prob_idx.toString())
+//        Log.d("Loc_prob_idx_ndarray","loc_prob_idx_ndarray: "+loc_prob_idx_ndarray.toString())
         var loc = mk.math.sumD3(loc_prob_idx_ndarray, axis = 0)                  //either this or the one below
         //loc = mk.math.cumSum(loc_prob_idx, axis = 0)
 
 
-        Log.d("Loc","loc: "+loc.toString())
+//        Log.d("Loc","loc: "+loc.toString())
 
         //processed_output_ndarry = mk.math.argMax(processed_output_ndarry.asD3Array(), axis = 0)
         var argMax_process_output = mk.math.argMaxD3(processed_output_ndarry.asD3Array(), axis = 0)
@@ -742,15 +742,15 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
 
         val loc_processed_output = loc_Argmax_ndarray
 
-        Log.d("Loc Processed Output","loc_processed_output: "+loc_processed_output.toString())
+//        Log.d("Loc Processed Output","loc_processed_output: "+loc_processed_output.toString())
 
         val col_sample = mk.linspace<Float>(0, 800-1, 100)
 
-        Log.d("Col Sample","col_sample: "+col_sample.toString())
+//        Log.d("Col Sample","col_sample: "+col_sample.toString())
 
         val col_sample_w = col_sample[1] - col_sample[0]
 
-        Log.d("Col Sample W","col_sample_w: "+col_sample_w.toString())
+//        Log.d("Col Sample W","col_sample_w: "+col_sample_w.toString())
 
         var max_lanes = loc_processed_output.shape[1]                //convert to kotlin (get processed_output columns)
         //temporary
@@ -776,10 +776,10 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
             }
 
             var sumLocPO_ndarray = mk.ndarray(sumLocPO)
-            Log.d("Ndarray for Loc_PO sum","sumLocPO_ndarray: "+sumLocPO_ndarray.toString())
-            Log.d("Loc_proc_out","loc_proc_out: "+loc_processed_output.shape[0].toString())
-            Log.d("Loc_proc_out","loc_proc_out: "+loc_processed_output.shape[1].toString())
-            Log.d("Loc_proc_out","loc_proc_out: "+loc_processed_output.shape[2].toString())
+//            Log.d("Ndarray for Loc_PO sum","sumLocPO_ndarray: "+sumLocPO_ndarray.toString())
+//            Log.d("Loc_proc_out","loc_proc_out: "+loc_processed_output.shape[0].toString())
+//            Log.d("Loc_proc_out","loc_proc_out: "+loc_processed_output.shape[1].toString())
+//            Log.d("Loc_proc_out","loc_proc_out: "+loc_processed_output.shape[2].toString())
             //if (mk.math.sum(loc_processed_output[:,lane_num]!= 0)>2) //convert to kotlin
             if (mk.math.sum(sumLocPO_ndarray)>2)
             {
@@ -787,7 +787,7 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
                 for(point_num in 0..(loc_processed_output.shape[0]-1))             //convert to kotlin (get processed_output rows) -> processed_output[0].length()
                 {
                     var thispoint = loc_processed_output[point_num,lane_num]
-                    Log.d("Loc Processed Output","loc_processed_output: "+loc_processed_output[point_num][lane_num][0].toString())
+                   // Log.d("Loc Processed Output","loc_processed_output: "+loc_processed_output[point_num][lane_num][0].toString())
                     if (loc_processed_output[point_num][lane_num][0] > 0F) {
                         var lane_point_left = (loc_processed_output[point_num,lane_num,0] * col_sample_w * 1200 / 800).toInt() -1
                         Log.d("Lane point left","lane_point_left: "+lane_point_left.toString())
@@ -938,10 +938,5 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
             return d
         }
 
-    }
-
-    @Throws(IOException::class)
-    fun loadModelFileLite(filename: String): Interpreter{
-        return Interpreter(File("$mountedPath/$filename"))
     }
 }

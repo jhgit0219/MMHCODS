@@ -1,13 +1,10 @@
 package com.anlehu.mmhcods
 
-import android.app.ActivityManager
-import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.widget.Button
 import androidx.appcompat.app.AppCompatActivity
 import androidx.constraintlayout.widget.ConstraintLayoutStates.TAG
-import androidx.core.app.ActivityCompat
 import org.opencv.android.OpenCVLoader
 
 class MainActivity : AppCompatActivity() {
@@ -45,8 +42,8 @@ class MainActivity : AppCompatActivity() {
         startButton = findViewById(R.id.start_button)
         startButton.setOnClickListener {
             laneClassifier.initialize()
-            laneClassifier.initializeInterpreter()
-            laneClassifier.imageToBitmap()
+            //laneClassifier.initializeInterpreter()
+            //laneClassifier.imageToBitmap()
             //laneClassifier.close()
         }
         Log.d(TAG,"classifier")
