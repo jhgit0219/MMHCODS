@@ -13,10 +13,10 @@ class TestImageView : androidx.appcompat.widget.AppCompatImageView {
     var points2: FloatArray? = null
 
     init{
-        boxPaint.color = Color.YELLOW
+        boxPaint.color = Color.RED
         boxPaint.alpha = 200
         boxPaint.style = Paint.Style.STROKE
-        boxPaint.strokeWidth = 3.0f
+        boxPaint.strokeWidth = 8.0f
     }
 
     constructor(context: Context?) : super(context!!) {
@@ -34,14 +34,14 @@ class TestImageView : androidx.appcompat.widget.AppCompatImageView {
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        if(points != null)
+        if(points != null && points!!.size >= 4)
             canvas.drawLines(points!!, boxPaint)
-        if(points2 != null)
+        if(points2 != null && points2!!.size >= 4)
             canvas.drawLines(points2!!, boxPaint)
         //canvas.drawLine(0f, 0f, 720f, 1630f, boxPaint)
     }
 
-    fun drawLane(points: FloatArray, points2: FloatArray){
+    fun drawLane(points: FloatArray?, points2: FloatArray?){
         this.points = points
         this.points2 = points2
         invalidate()

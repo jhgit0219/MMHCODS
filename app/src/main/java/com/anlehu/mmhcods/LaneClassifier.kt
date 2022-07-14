@@ -63,6 +63,7 @@ import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.collections.set
+import kotlin.math.pow
 
 
 class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
@@ -253,7 +254,7 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
 //            Bitmap.Config.ARGB_8888)
 
         //val path : String = getExternalStorageDirectory().getAbsolutePath() + "/detected_lanes.png"
-        var imgMat = Imgcodecs.imread("/storage/emulated/0/Download/detected_lane.jpg")
+        var imgMat = Imgcodecs.imread("/storage/emulated/0/Download/moto.jpg")
         Log.d("IMG_MAT_U", imgMat.get(0, 0).toString())
         //imgMat.convertTo(imgMat, CvType.CV_32FC4)
         Imgproc.cvtColor(imgMat, imgMat, Imgproc.COLOR_BGR2RGB)
@@ -929,8 +930,13 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
         for (i in 0 .. lane_points2.size-1 ){
             points2[i] = lane_points2[i].toFloat()
         }
-        // draw line on canvas
-        //tempCanvas.drawLines(points, boxPaint)
+        var fitPoint1 : FloatArray? = null
+        var fitPoint2 : FloatArray? = null
+        // best fit of line points
+        if(points.size >= 4 )
+            fitPoint1 = bestFit(points)
+        if(points2.size >= 4 )
+            fitPoint2 = bestFit(points2)
 
         Log.d("POINTS", "${points.joinToString(" ")}")
         val imageView = TestImageView(this.context)
@@ -952,11 +958,58 @@ class LaneClassifier(context: Context)  : AppCompatActivity(),  Detector {
         runOnUiThread {
             act.addContentView(linearLayout, linearLayout.layoutParams)
             //imageView.draw(tempCanvas)
-            imageView.drawLane(points, points2)
+            imageView.drawLane(fitPoint1, fitPoint2)
             imageView.invalidate()
             //act.setContentView(R.layout.activity_main)
         }
 
+    }
+
+    fun bestFit(points: FloatArray): FloatArray{
+        val length = points.size / 2
+        var m = 0f
+        var b = 0f
+        var sum_x = 0f
+        var sum_y = 0f
+        var sum_xy = 0f
+        var sum_x2 = 0f
+
+        for (i in points.indices step 2){
+            sum_x += points[i]
+            sum_y += points[i+1] // negative form of the y
+            sum_xy += points[i] * points[i+1]
+            sum_x2 += points[i].toDouble().pow(2.0).toFloat()
+        }
+
+        m = (length * sum_xy - sum_x * sum_y) / (length * sum_x2 - sum_x.toDouble().pow(2.0).toFloat())
+        b = (sum_y - m * sum_x) / length
+
+        Log.d("SLOPE", "Slope: $m and intercept $b")
+
+        //create Float Array of points
+        // In this case, we want to get the x-values based on the y-values
+        val bestFitArr = FloatArray(4)
+        //insert first x using equation x = (y - b) / m
+        bestFitArr[0] = ((points[1] - b) / m)-20f
+        //insert y at first x using equation mx + b
+        bestFitArr[1] = points[1]
+        bestFitArr[3] = points[points.size-1]// last index is the last y-value, 2nd to the last is the last x-value
+        //insert last x
+        bestFitArr[2] = ((bestFitArr[3] - b) / m) - 50f
+
+
+//        //determine if line is going to the left or right (from top to bottom)
+//        if(bestFitArr[0] > bestFitArr[2]) { // if x0 is greater than x1
+//            //adjust x0
+//            Log.d("LANE_DIR","Line going from bot to top right")
+//            bestFitArr[0] - 50f
+//        }else{
+//            //adjust x1
+//            Log.d("LANE_DIR","Line going from top to bot right")
+//            bestFitArr[0] - 50f
+//        }
+
+        return bestFitArr
     }
 
     companion object {
