@@ -18,9 +18,17 @@ import kotlin.math.max
 
 class ImageUtils {
 
+    /********************************************************************************************************
+     * Companion Object
+     * Gets transformation matrix
+     * Saves bitmap
+     * Resizes Images
+     * Converts YUV to ARGB and RGB
+     ********************************************************************************************************/
     companion object{
         /********************************************************************************************************
          * Gets transformation matrix
+         * @return matrix value
          ********************************************************************************************************/
         fun getTransformationMatrix(
             previewWidth: Int,
@@ -140,6 +148,9 @@ class ImageUtils {
             return bitmap
         }
 
+        /********************************************************************************************************
+         * Converts YUV Bytes to ARGB Bytes
+         ********************************************************************************************************/
         fun convertYUVtoARGB(
             yBytes: ByteArray,
             uBytes: ByteArray,
@@ -167,6 +178,9 @@ class ImageUtils {
 
         }
 
+        /********************************************************************************************************
+         * Converts YUV Bytes to RGB Bytes
+         ********************************************************************************************************/
         private fun YUVTORGB(yVal: Int, uVal: Int, vVal: Int): Int {
 
             // Adjust and check YUV values

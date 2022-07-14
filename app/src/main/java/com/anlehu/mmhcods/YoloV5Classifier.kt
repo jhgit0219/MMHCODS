@@ -56,6 +56,10 @@ import kotlin.math.pow
  */
 open class YoloV5Classifier: Detector {
 
+
+    /********************************************************************************************************
+     * Variable Initializations
+     ********************************************************************************************************/
     // Config values.
     // Pre-allocated buffers.
     private val labels = Vector<String>()
@@ -71,16 +75,30 @@ open class YoloV5Classifier: Detector {
     private var oup_zero_point = 0
     private var numClass = 0
 
+    /********************************************************************************************************
+     * Gets size of the input
+     * @return input size value
+     ********************************************************************************************************/
     fun getInputSize(): Int {
         return INPUT_SIZE
     }
 
+    /********************************************************************************************************
+     * Enables stat logging
+     ********************************************************************************************************/
     fun enableStatLogging(logStats: Boolean) {}
 
+    /********************************************************************************************************
+     * Gets stats
+     * @return blank string
+     ********************************************************************************************************/
     fun getStatString(): String? {
         return ""
     }
 
+    /********************************************************************************************************
+     * Actions performed on process close
+     ********************************************************************************************************/
     override fun close() {
         tfLite!!.close()
         tfLite = null
@@ -95,14 +113,23 @@ open class YoloV5Classifier: Detector {
         tfliteModel = null
     }
 
+    /********************************************************************************************************
+     * Sets number of threads for tflite interpreter
+     ********************************************************************************************************/
     override fun setNumOfThreads(numThread: Int) {
         if (tfLite != null) tfLite!!.setNumThreads(numThread)
     }
 
+    /********************************************************************************************************
+     * Sets NNAPI for tflite interpreter
+     ********************************************************************************************************/
     override fun setUseNNAPI(isChecked: Boolean) {
 //        if (tfLite != null) tfLite.setUseNNAPI(isChecked);
     }
 
+    /********************************************************************************************************
+     * Recreate tflite interpreter
+     ********************************************************************************************************/
     private fun recreateInterpreter() {
         if (tfLite != null) {
             tfLite!!.close()
@@ -110,6 +137,9 @@ open class YoloV5Classifier: Detector {
         }
     }
 
+    /********************************************************************************************************
+     * Function that allows tflite processing to be delegated to the GPU
+     ********************************************************************************************************/
     fun useGpu() {
         if (gpuDelegate == null) {
             gpuDelegate = GpuDelegate()
@@ -118,20 +148,33 @@ open class YoloV5Classifier: Detector {
         }
     }
 
+    /********************************************************************************************************
+     * Function that allows tflite processing to be delegated to the CPU
+     ********************************************************************************************************/
     fun useCPU() {
         recreateInterpreter()
     }
 
+    /********************************************************************************************************
+     * Function that makes tflite interpreter use Neural Network API
+     ********************************************************************************************************/
     fun useNNAPI() {
         nnapiDelegate = NnApiDelegate()
         tfliteOptions.addDelegate(nnapiDelegate)
         recreateInterpreter()
     }
 
+    /********************************************************************************************************
+     * Get value of object threshold
+     * @return value of minimum confidence of the applicaiton
+     ********************************************************************************************************/
     override fun getObjThresh(): Float {
         return MainActivity.MINIMUM_CONFIDENCE
     }
 
+    /********************************************************************************************************
+     * Variable Initializations
+     ********************************************************************************************************/
     // Float model
     private val IMAGE_MEAN = 0f
 
@@ -159,6 +202,11 @@ open class YoloV5Classifier: Detector {
     /** Options for configuring the Interpreter.  */
     private val tfliteOptions: Interpreter.Options = Interpreter.Options()
 
+
+    /********************************************************************************************************
+     * Configures non-maximum suppression which helps in selecting
+     * a single entity when there are many overlapping entities detected
+     ********************************************************************************************************/
     //non maximum suppression
     @RequiresApi(Build.VERSION_CODES.N)
     open fun nms(list: ArrayList<Detection>): ArrayList<Detection> {
@@ -194,10 +242,17 @@ open class YoloV5Classifier: Detector {
 
     private val mNmsThresh = 0.6f
 
+    /********************************************************************************************************
+     * Function that determines IOU, an evaluation metric
+     * used to measure the accuracy of an object detector on a particular dataset
+     ********************************************************************************************************/
     fun box_iou(a: RectF, b: RectF): Float {
         return box_intersection(a, b) / box_union(a, b)
     }
 
+    /********************************************************************************************************
+     * Function that determines box intersection for IOU
+     ********************************************************************************************************/
     fun box_intersection(a: RectF, b: RectF): Float {
         val w: Float = overlap(
             (a.left + a.right) / 2, a.right - a.left,
@@ -210,11 +265,18 @@ open class YoloV5Classifier: Detector {
         return if (w < 0.0 || h < 0.0) 0f else (w * h)
     }
 
+    /********************************************************************************************************
+     * Function that determines box union for IOU
+     ********************************************************************************************************/
     fun box_union(a: RectF, b: RectF): Float {
         val i = box_intersection(a, b)
         return (a.right - a.left) * (a.bottom - a.top) + (b.right - b.left) * (b.bottom - b.top) - i
     }
 
+    /********************************************************************************************************
+     * Function that returns overlap
+     * @return overlap value
+     ********************************************************************************************************/
     fun overlap(x1: Float, w1: Float, x2: Float, w2: Float): Float {
         val l1 = x1 - w1 / 2
         val l2 = x2 - w2 / 2
@@ -228,9 +290,9 @@ open class YoloV5Classifier: Detector {
     protected val BATCH_SIZE = 1
     protected val PIXEL_SIZE = 3
 
-    /**
-     * Writes Image data into a `ByteBuffer`.
-     */
+    /********************************************************************************************************
+     * Convert Bitmap input into ByteBuffer data type
+     ********************************************************************************************************/
     private fun convertBitmapToByteBuffer(bitmap: Bitmap){
 //        ByteBuffer byteBuffer = ByteBuffer.allocateDirect(4 * BATCH_SIZE * INPUT_SIZE * INPUT_SIZE * PIXEL_SIZE);
 //        byteBuffer.order(ByteOrder.nativeOrder());
@@ -261,6 +323,9 @@ open class YoloV5Classifier: Detector {
         }//return imgData
     }
 
+    /********************************************************************************************************
+     * Detect and process current Image
+     ********************************************************************************************************/
     @RequiresApi(Build.VERSION_CODES.N)
     override fun detectImage(bitmap: Bitmap): ArrayList<Detection> {
 
@@ -341,6 +406,9 @@ open class YoloV5Classifier: Detector {
         return nms(detections)
     }
 
+    /********************************************************************************************************
+     * Function that returns boolean value of box validity
+     ********************************************************************************************************/
     open fun checkInvalidateBox(
         x: Float,
         y: Float,
@@ -392,6 +460,11 @@ open class YoloV5Classifier: Detector {
         }
         return true
     }
+
+    /********************************************************************************************************
+     * Companion Object
+     * Initialize a TensorFlow session
+     ********************************************************************************************************/
     companion object{
 
         // Number of threads in the java app

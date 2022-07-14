@@ -7,6 +7,9 @@ import android.provider.BaseColumns
 
 class DbHelper(context: Context): SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
 
+    /********************************************************************************************************
+     * Object Initialization
+     ********************************************************************************************************/
     object ViolationEntry : BaseColumns{
         const val TABLE_NAME = "violations_table"
         const val COL_TIMESTAMP = "timestamp"
@@ -16,19 +19,33 @@ class DbHelper(context: Context): SQLiteOpenHelper(context, DATABASE_NAME, null,
         const val COL_LP = "license_plate"
     }
 
+    /********************************************************************************************************
+     * On create method
+     ********************************************************************************************************/
     override fun onCreate(db: SQLiteDatabase?) {
         db!!.execSQL(SQL_CREATE_ENTRIES)
     }
 
+    /********************************************************************************************************
+     * On upgrade method
+     ********************************************************************************************************/
     override fun onUpgrade(db: SQLiteDatabase?, old: Int, new: Int) {
         db!!.execSQL(SQL_DELETE_ENTRIES)
         onCreate(db)
     }
 
+    /********************************************************************************************************
+     * On downgrade method
+     ********************************************************************************************************/
     override fun onDowngrade(db: SQLiteDatabase?, old: Int, new: Int) {
         onUpgrade(db, old, new)
     }
 
+    /********************************************************************************************************
+     * Companion Object
+     * Creates SQL Table
+     * Deletes specific entries from SQL Table
+     ********************************************************************************************************/
     companion object{
         private const val SQL_CREATE_ENTRIES =
             "CREATE TABLE ${ViolationEntry.TABLE_NAME} ("+

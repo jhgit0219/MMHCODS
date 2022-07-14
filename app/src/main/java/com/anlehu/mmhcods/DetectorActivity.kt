@@ -27,6 +27,10 @@ import java.util.*
 
 open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListener {
 
+    /********************************************************************************************************
+     Variable Initializaitons
+     ********************************************************************************************************/
+
     private lateinit var trackingOverlay: OverlayView
     private lateinit var frameToCropMat: Matrix
     private lateinit var cropToFrameMat: Matrix
@@ -332,9 +336,9 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                         Log.d("TRIKE_LOC", "Found Tricycle")
                     }
                 }
-                /**
+                /********************************************************************************************************
                  * Check each motorcycle for the location rect, and see if any helmet or lp is within this rectangle.
-                 */
+                 ********************************************************************************************************/
                 for(motorcycle in motorcycleList){
                     var isTricycle = false
                     // Check if motorcycle is bound within a tricycle box. The requirements are the motorcycle must be
@@ -388,9 +392,10 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                         }
                     }
 
-                    /** Check rect locations for overtaking/counterflowing
+                    /********************************************************************************************************
+                     * Check rect locations for overtaking/counterflowing
                      *  Currently hardcoded
-                     */
+                     ********************************************************************************************************/
 
                     if(motorcycle.licensePlate != null){
                         val pointX = 1080 - motorcycle.licensePlate!!.detectedLicense.location.left.toInt() + (motorcycle.licensePlate!!.detectedLicense.location.width().toInt() / 2)
@@ -409,9 +414,10 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                             Log.d("PROC_VIOL", "COUNTERFLOWING DETECTED")
                         }
                     }
-                    /**
+
+                    /********************************************************************************************************
                      * Check current potential violations list. If there is any, process the violations list.
-                     */
+                     ********************************************************************************************************/
                     val originalPotentialViolationsList = liveModel.getPotentialViolationsList() // Get potential list
                     var refTime = FileUtil.getDateTime()
                     for(potViolator in originalPotentialViolationsList!!){                      // check every pot vio
@@ -449,11 +455,12 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                             }
                         }
                     }
-                    /**
+
+                    /********************************************************************************************************
                      * Place motorcycle into potential violation if non-existent yet. Next Frame, check if existing license plate is within potential
                      * violation list.
                      * NO HELMET DETECTION
-                     */
+                     ********************************************************************************************************/
 
                     if(motorcycle.helmet == null && !motorcycle.potentialViolation && !motorcycle.finalViolation){
                         Log.d("MOTOR_DETECTED", "HELMET NOT FOUND, PLACING IN POTENTIAL")
@@ -467,10 +474,9 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
             }
         }
 
-        /**
+        /********************************************************************************************************
          * Process the final violations list. Save it into device, preparing for upload
-         */
-
+         ********************************************************************************************************/
         private fun processViolation(potViolator: DetectorActivity.MotorcycleObject) {
             if(potViolator.licensePlate != null){
                 Runnable{
@@ -493,9 +499,9 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
             }
 
         }
-        /**
+        /********************************************************************************************************
          * Checker for LP
-         */
+         ********************************************************************************************************/
         @Synchronized
         fun readLp(motorcycleObject: MotorcycleObject){
             val licensePlate = motorcycleObject.licensePlate!!.detectedLicense
@@ -548,6 +554,9 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
         }
     }
 
+    /********************************************************************************************************
+     * Initialization of Motorcycle Object
+     ********************************************************************************************************/
     class MotorcycleObject {
         var snapshot: Bitmap? = null
         var motorcyclist: Detection? = null
@@ -559,6 +568,9 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
         var dateTime: String = ""
     }
 
+    /********************************************************************************************************
+     * Initialization of License Plate Object
+     ********************************************************************************************************/
     class LicensePlate {
 
         var licenseNumber: String = ""

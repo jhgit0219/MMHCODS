@@ -5,6 +5,9 @@ import android.graphics.RectF
 
 interface Detector {
 
+    /********************************************************************************************************
+     * Function Initializations
+     ********************************************************************************************************/
     fun detectImage(bitmap: Bitmap): ArrayList<Detection>
 
     fun close()
@@ -15,33 +18,39 @@ interface Detector {
 
     fun getObjThresh(): Float
 
-    /**
-     *  result returned by detector
-     */
-
+    /********************************************************************************************************
+     * result returned by detector
+     ********************************************************************************************************/
     open class Detection{
-        /**
-         * Unique id for what has been detected
-         */
+        /********************************************************************************************************
+         * Unique ID for what has been detected
+         ********************************************************************************************************/
         var id: String
 
-        /**
+        /********************************************************************************************************
          * Name for detection
-         */
+         ********************************************************************************************************/
         var title: String
 
-        /**
-         * Value that shows how confident the model is about a detected class in a frame. Higher = Better
-         */
+        /********************************************************************************************************
+         * Value that shows how confident the model is about the detected class in the frame. Higher is better.
+         ********************************************************************************************************/
         var confidence: Float = 0f
 
-        /**
-         *  Location within frame for the detected object
-         */
+        /********************************************************************************************************
+         * Location of the detected object within the frame
+         ********************************************************************************************************/
+
+        /********************************************************************************************************
+         * Variable Initializations
+         ********************************************************************************************************/
         var location: RectF
 
         var detectedClass: Int = -1
 
+        /********************************************************************************************************
+         * Class constructor
+         ********************************************************************************************************/
         constructor(): super(){
             id = ""
             title = ""
@@ -49,6 +58,9 @@ interface Detector {
             location = RectF()
         }
 
+        /********************************************************************************************************
+         * Class constructor copying detection object attributes
+         ********************************************************************************************************/
         constructor(detection: Detection): super(){
             this.id = detection.id
             this.title = detection.title
@@ -56,6 +68,9 @@ interface Detector {
             this.location = detection.location
         }
 
+        /********************************************************************************************************
+         * Class constructor
+         ********************************************************************************************************/
         constructor(
             id: String,
             title: String,
@@ -68,6 +83,9 @@ interface Detector {
             this.location = location
         }
 
+        /********************************************************************************************************
+         * Class constructor
+         ********************************************************************************************************/
         constructor(
             id: String,
             title: String,
@@ -82,6 +100,10 @@ interface Detector {
             this.detectedClass = detectedClass
         }
 
+        /********************************************************************************************************
+         * Converting class characteristics into a single string
+         * @return a single string containing combined class characteristics
+         ********************************************************************************************************/
         override fun toString(): String{
 
             var resultString: String = ""

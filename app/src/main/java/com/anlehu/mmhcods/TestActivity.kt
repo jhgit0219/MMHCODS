@@ -27,6 +27,10 @@ import java.util.*
 
 class TestActivity : AppCompatActivity() {
 
+    /********************************************************************************************************
+     * Variable Initializaitons
+     ********************************************************************************************************/
+
     private var handlerThread: HandlerThread? = null
     private var handler: Handler? = null
 
@@ -128,7 +132,9 @@ class TestActivity : AppCompatActivity() {
 
     }
 
-
+    /********************************************************************************************************
+     * Processes current image
+     ********************************************************************************************************/
     @RequiresApi(Build.VERSION_CODES.N)
     fun processImage(){
         // run in a background thread
@@ -172,6 +178,9 @@ class TestActivity : AppCompatActivity() {
         //}
     }
 
+    /********************************************************************************************************
+     * Initialize all the detectors
+     ********************************************************************************************************/
     fun initializeDetectors(){
         try{
             detector = DetectorFactory.getDetector(assets, MainActivity.MAIN_MODEL_NAME)
@@ -205,11 +214,17 @@ class TestActivity : AppCompatActivity() {
         frameToLaneMat.invert(laneToFrameMat)
     }
 
+    /********************************************************************************************************
+     * Sets preview dimensions
+     ********************************************************************************************************/
     fun setPreviewDimensions(width: Int, height: Int){
         previewWidth = width
         previewHeight = height
     }
 
+    /********************************************************************************************************
+     * Actions needed when process is resumed
+     ********************************************************************************************************/
     @Synchronized
     override fun onResume(){
         super.onResume()
@@ -218,6 +233,9 @@ class TestActivity : AppCompatActivity() {
         handler = Handler(handlerThread!!.looper)
     }
 
+    /********************************************************************************************************
+     * Actions needed when process is paused
+     ********************************************************************************************************/
     @Synchronized
     override fun onPause() {
         handlerThread!!.quitSafely()
@@ -231,11 +249,17 @@ class TestActivity : AppCompatActivity() {
         super.onPause()
     }
 
+    /********************************************************************************************************
+     * Action performed when process is stopped
+     ********************************************************************************************************/
     @Synchronized
     override fun onStop() {
         super.onStop()
     }
 
+    /********************************************************************************************************
+     * Action performed when process is destroyed
+     ********************************************************************************************************/
     @Synchronized
     override fun onDestroy() {
         super.onDestroy()

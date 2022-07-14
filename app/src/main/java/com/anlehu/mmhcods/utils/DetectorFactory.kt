@@ -6,8 +6,15 @@ import com.anlehu.mmhcods.LaneClassifier
 import com.anlehu.mmhcods.YoloV5Classifier
 
 class DetectorFactory {
-
+    /********************************************************************************************************
+     * Companion object
+     * Gets Detector of both YOLOv5 and Lane Detection Systems
+     ********************************************************************************************************/
     companion object{
+        /********************************************************************************************************
+         * Function that gets the current detector being used for the YOLOv5 system
+         * @return detector for YOLOv5 system
+         ********************************************************************************************************/
         fun getDetector(assetManager: AssetManager, modelFileName: String): YoloV5Classifier{
             var labelFileName = ""
             var isQuantized: Boolean = false
@@ -23,6 +30,10 @@ class DetectorFactory {
                 inputSize)
         }
 
+        /********************************************************************************************************
+         * Function that gets current detector for the lane detection system
+         * @return detector for lane detection system
+         ********************************************************************************************************/
         fun getLaneDetector(assetManager: AssetManager, modelFileName: String): LaneClassifier{
             var labelFileName = ""
             var isQuantized: Boolean = false

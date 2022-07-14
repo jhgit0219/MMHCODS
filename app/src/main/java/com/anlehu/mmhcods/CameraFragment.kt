@@ -26,6 +26,9 @@ import java.util.concurrent.TimeUnit
 
 class CameraFragment() : Fragment() {
 
+    /********************************************************************************************************
+     * Variable Initializaitons
+     ********************************************************************************************************/
     private lateinit var adjustView: AutoAdjustView
     private lateinit var previewSize: Size
     private lateinit var imageReader: ImageReader
@@ -51,6 +54,9 @@ class CameraFragment() : Fragment() {
     /** Semaphore to lock camera; won't allow app to exit before camera closes**/
     var cameraLock: Semaphore = Semaphore(1)
 
+    /********************************************************************************************************
+     * Function that tracks progress of Capture Request. Sets session, request, and result.
+     ********************************************************************************************************/
     private var captureCallback: CaptureCallback =
         object: CaptureCallback() {
             override fun onCaptureProgressed(
@@ -62,6 +68,9 @@ class CameraFragment() : Fragment() {
                 request: CaptureRequest,
                 result: TotalCaptureResult) {}
     }
+    /********************************************************************************************************
+     * Function Constructor
+     ********************************************************************************************************/
     constructor(
         callback: ConnectionCallback,
         imageAvailableListener: ImageReader.OnImageAvailableListener,
@@ -72,9 +81,16 @@ class CameraFragment() : Fragment() {
         this.layout = layout
         this.inputSize = inputSize
     }
+    /********************************************************************************************************
+     * Get Capture Callback Object
+     * @return current captureCallback instance
+     ********************************************************************************************************/
     fun getThisCaptureCallback(): CaptureCallback{
         return captureCallback
     }
+    /********************************************************************************************************
+     * Function that performs certain actions depending on status of current capture camera session
+     ********************************************************************************************************/
     private var stateCallback =
         object: CameraDevice.StateCallback() {
             override fun onOpened(camDevice: CameraDevice){
@@ -97,6 +113,10 @@ class CameraFragment() : Fragment() {
             }
         }
 
+    /********************************************************************************************************
+     * Function that performs certain actions depending on the status of
+     * the associated surface texture in the current texture view
+     ********************************************************************************************************/
     var surfaceTextureListener: TextureView.SurfaceTextureListener =
         object: TextureView.SurfaceTextureListener {
             override fun onSurfaceTextureAvailable(p0: SurfaceTexture, p1: Int, p2: Int) {
@@ -116,7 +136,9 @@ class CameraFragment() : Fragment() {
             }
         }
 
-
+    /********************************************************************************************************
+     * Function that determines optimal size for camera output
+     ********************************************************************************************************/
     private fun chooseOptimalSize(choices: Array<Size>, width: Int, height: Int): Size{
         Log.d("DEBUG", "SUCCESS")
         val minSize = Math.max(Math.min(width.toFloat(), height.toFloat()), MINIMUM_PREVIEW_SIZE.toFloat())
@@ -140,15 +162,22 @@ class CameraFragment() : Fragment() {
             choices[0]
         }
     }
-
+    /********************************************************************************************************
+     * Function that returns on create view
+     * @return attributes for on create view
+     ********************************************************************************************************/
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         return inflater.inflate(layout, container, false)
     }
-
+    /********************************************************************************************************
+     * Function that sets AutoAdjustView
+     ********************************************************************************************************/
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         adjustView = view.findViewById(R.id.adjust_view)
     }
-
+    /********************************************************************************************************
+     * Prints status of adjustView once process is resumed
+     ********************************************************************************************************/
     override fun onResume() {
         super.onResume()
         startBackgroundThread()
@@ -161,16 +190,22 @@ class CameraFragment() : Fragment() {
             adjustView.surfaceTextureListener = surfaceTextureListener
         }
     }
-
+    /********************************************************************************************************
+     * Function that handles actions that happen when process is paused
+     ********************************************************************************************************/
     override fun onPause() {
         Log.d("CLOSING", "SUCCESS")
         closeCamera()
         stopBackgroundThread()
         super.onPause()
     }
-
+    /********************************************************************************************************
+     * Set the camera ID
+     ********************************************************************************************************/
     fun setCamera(cameraId: String){this.cameraId = cameraId}
-
+    /********************************************************************************************************
+     * Function that sets camera output
+     ********************************************************************************************************/
     private fun setCameraOutputs(){
         Log.d("DEBUG", "Setting up Camera Outputs")
         var activity = activity
@@ -193,7 +228,9 @@ class CameraFragment() : Fragment() {
         }
         cameraConnectionCallback.onPreviewSizeChosen(previewSize, sensorOrientation)
     }
-
+    /********************************************************************************************************
+     * Function that opens the camera for inputs
+     ********************************************************************************************************/
     fun openCamera(width: Int, height: Int){
         Log.d("Opening Camera", "SUCCESS")
         setCameraOutputs()
@@ -209,7 +246,9 @@ class CameraFragment() : Fragment() {
             throw Exception(e)
         }
     }
-
+    /********************************************************************************************************
+     * Function that closes camera and camera session once application is stopped
+     ********************************************************************************************************/
     private fun closeCamera(){
         try{
             cameraLock.acquire()
@@ -235,14 +274,18 @@ class CameraFragment() : Fragment() {
             Log.d("CAMLOCK", "RELEASED Successful")
         }
     }
-
+    /********************************************************************************************************
+     * Start background thread for ImageListener
+     ********************************************************************************************************/
     private fun startBackgroundThread(){
         backgroundThread = HandlerThread("ImageListener")
         backgroundThread!!.start()
         backgroundHandler = Handler(backgroundThread!!.looper)
         Log.d("START_THREAD", "STARTED")
     }
-
+    /********************************************************************************************************
+     * Stops current running background thread
+     ********************************************************************************************************/
     private fun stopBackgroundThread(){
         backgroundThread!!.quitSafely()
         try{
@@ -254,7 +297,9 @@ class CameraFragment() : Fragment() {
         }
     }
 
-
+    /********************************************************************************************************
+     * Function that initializes attributes for the creation of new Camera Session
+     ********************************************************************************************************/
     private fun createCameraSession(){
         try{
             val texture = adjustView.surfaceTexture
@@ -304,7 +349,9 @@ class CameraFragment() : Fragment() {
             Log.e("OnConfigured", "Error occurred while creating capture session")
         }
     }
-
+    /********************************************************************************************************
+     * Configures SurfaceTextureListener used to listen to surface texture events in camera session
+     ********************************************************************************************************/
     fun configTransform(width: Int, height: Int){
         val activity = activity
         if(adjustView == null || previewSize == null || activity == null){
@@ -332,7 +379,10 @@ class CameraFragment() : Fragment() {
         }
         adjustView.setTransform(matrix)
     }
-
+    /********************************************************************************************************
+     * Companion Object
+     * Sets new instance of CameraFragment
+     ********************************************************************************************************/
     companion object{
         fun newInstance(
             callback: ConnectionCallback,
@@ -344,14 +394,18 @@ class CameraFragment() : Fragment() {
         }
     }
 }
-
+/********************************************************************************************************
+ * Function necessary for choosing optimal size
+ ********************************************************************************************************/
 open class CompareSizesByArea: Comparator<Size>{
     override fun compare(p0: Size?, p1: Size?): Int {
         return java.lang.Long.signum(p0!!.width.toLong() * p0!!.height.toLong()
                 - p1!!.width.toLong() * p1!!.height.toLong())
     }
 }
-
+/********************************************************************************************************
+ * Sets session camera callback
+ ********************************************************************************************************/
 fun interface ConnectionCallback{
     fun onPreviewSizeChosen(size: Size, cameraRotation: Int)
 }

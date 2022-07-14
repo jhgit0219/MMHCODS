@@ -13,6 +13,9 @@ import java.util.*
 
 class BoxTracker {
 
+    /********************************************************************************************************
+     * Variable Initializaitons
+     ********************************************************************************************************/
     private var trackedObjects: MutableList<TrackedPrediction> = LinkedList()
     private var borderedText: BorderedText
     private var textSize: Float
@@ -26,6 +29,10 @@ class BoxTracker {
 
     var frameToCanvasMat: Matrix = Matrix()
 
+
+    /********************************************************************************************************
+     * nitialize variables used as attributes of detected objects
+     *******************************************************************************************************/
     private class TrackedPrediction{
         lateinit var location: RectF
         var detectionConfidence: Float = 0.0f
@@ -34,6 +41,9 @@ class BoxTracker {
 
     }
 
+    /********************************************************************************************************
+     * Box Tracker constructor that initializes box characteristics
+     ********************************************************************************************************/
     constructor(context: Context){
         boxPaint.color = Color.RED
         boxPaint.strokeWidth = 10.0f
@@ -51,6 +61,9 @@ class BoxTracker {
 
     }
 
+    /********************************************************************************************************
+     * Sets frame configuration
+     ********************************************************************************************************/
     @Synchronized
     fun setFrameConfig(
         width: Int, height: Int, sensorOrientation: Int
@@ -61,6 +74,9 @@ class BoxTracker {
         lanePoints = FloatArray(0)
     }
 
+    /********************************************************************************************************
+     *
+     ********************************************************************************************************/
     @Synchronized
     fun drawDebugBoxes(canvas: Canvas){
         val textPaint = Paint()
@@ -80,6 +96,9 @@ class BoxTracker {
         }
     }
 
+    /********************************************************************************************************
+     * Function that draws the boxes as overlay to the current image indicating the detected objects
+     ********************************************************************************************************/
     @Synchronized
     fun draw(canvas: Canvas) {
         val rotated = sensorOrientation % 180 == 90
@@ -115,12 +134,18 @@ class BoxTracker {
         //canvas.drawLines(lanePoints, boxPaint)
     }
 
+    /********************************************************************************************************
+     * Tracks and prints processed results
+     ********************************************************************************************************/
     @Synchronized
     fun trackResults(results: List<Detection>, lane: FloatArray, timeStamp: Long){
         Log.i("BoxTracker:", "${results.size} results from $timeStamp")
         processResults(results, lane)
     }
 
+    /********************************************************************************************************
+     * Processes detected objects and tracks their position/location
+     ********************************************************************************************************/
     private fun processResults(results: List<Detection>, lane: FloatArray) {
         // rectangles to track
         val rectsToTrack: MutableList<Pair<Float, Detection>> = LinkedList()
@@ -176,6 +201,10 @@ class BoxTracker {
 
     }
 
+    /********************************************************************************************************
+     * Companion Object
+     * Sets Text Size and Min Size
+     ********************************************************************************************************/
     companion object{
         const val TEXT_SIZE_DIP = 18.0f
         const val MIN_SIZE = 16.0f

@@ -9,6 +9,10 @@ import org.opencv.android.OpenCVLoader
 
 class MainActivity : AppCompatActivity() {
 
+    /********************************************************************************************************
+     * Variable Initialization
+     ********************************************************************************************************/
+
     private lateinit var startButton: Button
     private lateinit var testButton: Button
 
@@ -94,9 +98,10 @@ class MainActivity : AppCompatActivity() {
         }*/
     }
 
-    /**
-     * companion objects
-     */
+    /********************************************************************************************************
+     * Companion Object
+     * Sets values for Detector related variables
+     ********************************************************************************************************/
     companion object{
 
         var MINIMUM_CONFIDENCE = 0.4f

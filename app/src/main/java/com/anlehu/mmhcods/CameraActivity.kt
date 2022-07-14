@@ -19,6 +19,9 @@ import com.anlehu.mmhcods.utils.ImageUtils
 abstract class CameraActivity: AppCompatActivity(),
     ImageReader.OnImageAvailableListener {
 
+    /********************************************************************************************************
+     * Variable Initializations
+     ********************************************************************************************************/
     private var handlerThread: HandlerThread? = null
     private var handler: Handler? = null
     private val yuvBytes = arrayOfNulls<ByteArray>(3)
@@ -32,6 +35,9 @@ abstract class CameraActivity: AppCompatActivity(),
     var rgbBytes: IntArray? = null
     lateinit var imageConverter: Runnable
 
+    /********************************************************************************************************
+     * On Create method
+     ********************************************************************************************************/
     override fun onCreate(savedInstanceState: Bundle?){
         super.onCreate(null)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -44,6 +50,10 @@ abstract class CameraActivity: AppCompatActivity(),
         }
     }
 
+    /********************************************************************************************************
+     * Overrides onImageAvailable method; processes read image,
+     * saves it as yuvBytes and coverts it to rgbBytes
+     ********************************************************************************************************/
     override fun onImageAvailable(imageReader: ImageReader) {
 
         // Only run if the preview size has been initialized
@@ -102,12 +112,18 @@ abstract class CameraActivity: AppCompatActivity(),
         Trace.endSection()
     }
 
+    /********************************************************************************************************
+     * Function that makes handler run in the background
+     ********************************************************************************************************/
     @Synchronized
     fun runInBackground(r: Runnable){
         if(handler != null)
             handler!!.post(r)
     }
 
+    /********************************************************************************************************
+     * Function that runs handler thread once process is resumed
+     ********************************************************************************************************/
     @Synchronized
     override fun onResume(){
         super.onResume()
@@ -116,6 +132,9 @@ abstract class CameraActivity: AppCompatActivity(),
         handler = Handler(handlerThread!!.looper)
     }
 
+    /********************************************************************************************************
+     * Function that pauses handler once process is paused
+     ********************************************************************************************************/
     @Synchronized
     override fun onPause() {
         handlerThread!!.quitSafely()
@@ -129,20 +148,32 @@ abstract class CameraActivity: AppCompatActivity(),
         super.onPause()
     }
 
+    /********************************************************************************************************
+     * Stops the process
+     ********************************************************************************************************/
     @Synchronized
     override fun onStop() {
         super.onStop()
     }
 
+    /********************************************************************************************************
+     * Destroys the process
+     ********************************************************************************************************/
     @Synchronized
     override fun onDestroy() {
         super.onDestroy()
     }
 
+    /********************************************************************************************************
+     * Start the process again
+     ********************************************************************************************************/
     fun readyForNextImage(){
         postInferenceCallback.run()
     }
 
+    /********************************************************************************************************
+     * Function that fills yuvBytes using plane from image input
+     ********************************************************************************************************/
     private fun fillBytes(planes: Array<Image.Plane>, yuvBytes: Array<ByteArray>) {
         for(i in planes.indices){
             val byteBuffer = planes[i].buffer
@@ -154,11 +185,18 @@ abstract class CameraActivity: AppCompatActivity(),
         }
     }
 
+    /********************************************************************************************************
+     *Get RGB Bytes of image
+     * @return rgbBytes variable value
+     ********************************************************************************************************/
     fun getRGBBytes(): IntArray{
         imageConverter.run()
         return rgbBytes!!
     }
 
+    /********************************************************************************************************
+     * Initializes and shows camera fragment
+     ********************************************************************************************************/
     private fun showCameraFragment() {
         val cameraId = chooseCamera()
         val cameraFragment: CameraFragment = CameraFragment.newInstance(
@@ -176,6 +214,9 @@ abstract class CameraActivity: AppCompatActivity(),
         supportFragmentManager.beginTransaction().replace(R.id.container, fragment).commit()
     }
 
+    /********************************************************************************************************
+     * Function that indicates what phone camera is going to be chosen as input source
+     ********************************************************************************************************/
     private fun chooseCamera(): String? {
         val manager: CameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
         try{
@@ -192,6 +233,9 @@ abstract class CameraActivity: AppCompatActivity(),
         return null
     }
 
+    /********************************************************************************************************
+     * Requests camera permission when app is ran (if it is not already given)
+     ********************************************************************************************************/
     private fun requestCameraPermissions(){
         if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
             if(shouldShowRequestPermissionRationale(PERMISSION_CAMERA)){
@@ -203,6 +247,9 @@ abstract class CameraActivity: AppCompatActivity(),
         return
     }
 
+    /********************************************************************************************************
+     * Indicator that permission to use camera is granted
+     ********************************************************************************************************/
     private fun permissionGranted(): Boolean {
         return if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
             checkSelfPermission(PERMISSION_CAMERA) == PackageManager.PERMISSION_GRANTED
@@ -211,11 +258,18 @@ abstract class CameraActivity: AppCompatActivity(),
         }
     }
 
+    /********************************************************************************************************
+     * Abstract Functions
+     ********************************************************************************************************/
     abstract fun getLayoutId(): Int
     abstract fun getDesiredPreviewFrameSize(): Size
     abstract fun onPreviewSizeChosen(size: Size, rotation: Int)
     abstract fun processImage()
 
+    /********************************************************************************************************
+     * Companion Object
+     * Sets camera permission and permission request values
+     ********************************************************************************************************/
     companion object{
 
         var PERMISSION_CAMERA = Manifest.permission.CAMERA

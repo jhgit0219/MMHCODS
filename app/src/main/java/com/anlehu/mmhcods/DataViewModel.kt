@@ -9,6 +9,10 @@ import java.util.concurrent.Semaphore
 
 class DataViewModel: ViewModel() {
 
+    /********************************************************************************************************
+     * Variable Initializations
+     ********************************************************************************************************/
+
     private var tempList : MutableList<DetectorActivity.MotorcycleObject> = ArrayList<DetectorActivity.MotorcycleObject>()
     private var finalTempList : MutableList<DetectorActivity.MotorcycleObject> = ArrayList<DetectorActivity.MotorcycleObject>()
     private var reportedTempList: MutableList<String> = ArrayList<String>()
@@ -26,6 +30,9 @@ class DataViewModel: ViewModel() {
         reportedLicensePlateList.value = reportedTempList
     }
 
+    /********************************************************************************************************
+     * Function that adds current motorcycleObject to potentialViolationList
+     ********************************************************************************************************/
     @Synchronized
     fun addToPotentialViolationsList(motorcycleObject: DetectorActivity.MotorcycleObject){
         try{
@@ -40,6 +47,9 @@ class DataViewModel: ViewModel() {
         }
 
     }
+    /********************************************************************************************************
+     * Function that removes a motorcycleObject from potentialViolationList
+     ********************************************************************************************************/
     @RequiresApi(Build.VERSION_CODES.N)
     @Synchronized
     fun removeFromPotentialViolationsList(motorcycleObject: DetectorActivity.MotorcycleObject){
@@ -54,6 +64,9 @@ class DataViewModel: ViewModel() {
             potLock.release()
         }
     }
+    /********************************************************************************************************
+     * Function that adds motorcycleObject to finalViolationList
+     ********************************************************************************************************/
     @Synchronized
     fun addToFinalViolationsList(motorcycleObject: DetectorActivity.MotorcycleObject){
         try{
@@ -67,6 +80,9 @@ class DataViewModel: ViewModel() {
             finLock.release()
         }
     }
+    /********************************************************************************************************
+     * Function that removes a motorcycleObject from finalViolationList
+     ********************************************************************************************************/
     @RequiresApi(Build.VERSION_CODES.N)
     @Synchronized
     fun removeFromFinalViolationsList(motorcycleObject: DetectorActivity.MotorcycleObject){
@@ -82,6 +98,9 @@ class DataViewModel: ViewModel() {
         }
 
     }
+    /********************************************************************************************************
+     * Adds motorcycleObject's license plate value to reportedList
+     ********************************************************************************************************/
     @Synchronized
     fun addToReportedList(ln: String){
         try{
@@ -95,6 +114,9 @@ class DataViewModel: ViewModel() {
             repLock.release()
         }
     }
+    /********************************************************************************************************
+     * Removes motorcycleObject's license plate value from reportedList
+     ********************************************************************************************************/
     @RequiresApi(Build.VERSION_CODES.N)
     @Synchronized
     fun removeFromReportedList(ln: String){
@@ -110,6 +132,10 @@ class DataViewModel: ViewModel() {
         }
 
     }
+    /********************************************************************************************************
+     * Gets list of objects from potentialViolationsList
+     * @return current list of objects in potentialViolationsList
+     ********************************************************************************************************/
     @Synchronized
     fun getPotentialViolationsList(): MutableList<DetectorActivity.MotorcycleObject>? {
         var list: MutableList<DetectorActivity.MotorcycleObject> = ArrayList()
@@ -124,6 +150,10 @@ class DataViewModel: ViewModel() {
         return list
 
     }
+    /********************************************************************************************************
+     * Gets list of objects from finalViolationsList
+     * @return current list of objects in finalViolationsList
+     ********************************************************************************************************/
     @Synchronized
     fun getFinalViolationsList(): MutableList<DetectorActivity.MotorcycleObject>? {
         var list: MutableList<DetectorActivity.MotorcycleObject> = ArrayList()
@@ -137,6 +167,10 @@ class DataViewModel: ViewModel() {
         }
         return list
     }
+    /********************************************************************************************************
+     * Gets list of values from reportedList
+     * @return values from reportedList
+     ********************************************************************************************************/
     @Synchronized
     fun getReportedList(): MutableList<String> {
         var list: MutableList<String> = ArrayList()
@@ -150,6 +184,9 @@ class DataViewModel: ViewModel() {
         }
         return list
     }
+    /********************************************************************************************************
+     * Sets and populates potentialViolationsList
+     ********************************************************************************************************/
     @Synchronized
     fun setPotentialViolationsList(list: MutableList<DetectorActivity.MotorcycleObject>){
         try{
@@ -162,6 +199,9 @@ class DataViewModel: ViewModel() {
         }
 
     }
+    /********************************************************************************************************
+     * Sets and populates finalViolationsList
+     ********************************************************************************************************/
     @Synchronized
     fun setFinalViolationsList(list: MutableList<DetectorActivity.MotorcycleObject>){
         try{
@@ -174,6 +214,9 @@ class DataViewModel: ViewModel() {
         }
 
     }
+    /********************************************************************************************************
+     * Sets and populates reportedList
+     ********************************************************************************************************/
     @Synchronized
     fun setReportedList(list: MutableList<String>){
         try{
