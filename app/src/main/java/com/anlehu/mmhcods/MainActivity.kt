@@ -20,7 +20,6 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-
         var laneClassifier = LaneClassifier(this)
 
         if (OpenCVLoader.initDebug()) {
@@ -33,15 +32,16 @@ class MainActivity : AppCompatActivity() {
         startButton.setOnClickListener {
             startActivity(
                 Intent(
-                    this@MainActivity,
-                    //LaneClassifier(this)::class.java
-                            DetectorActivity::class.java
+                    this,
+                    LaneClassifier::class.java
+                            //DetectorActivity::class.java
                 )
             )
         }*/
         startButton = findViewById(R.id.start_button)
         startButton.setOnClickListener {
             laneClassifier.initialize()
+
             //laneClassifier.initializeInterpreter()
             //laneClassifier.imageToBitmap()
             //laneClassifier.close()

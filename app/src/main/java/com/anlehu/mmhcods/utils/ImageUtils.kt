@@ -6,7 +6,6 @@ import android.os.Environment
 import android.util.Log
 import java.io.File
 import java.io.FileOutputStream
-import java.lang.Exception
 import kotlin.math.abs
 import kotlin.math.max
 
@@ -59,6 +58,10 @@ class ImageUtils {
             }
 
             return matrix
+
+        }
+
+        fun normalize(bitmap: Bitmap){
 
         }
 

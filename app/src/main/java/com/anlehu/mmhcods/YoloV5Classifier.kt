@@ -96,7 +96,7 @@ open class YoloV5Classifier: Detector {
     }
 
     override fun setNumOfThreads(numThread: Int) {
-        if (tfLite != null) tfLite!!.setNumThreads(numThread)
+        if (tfLite != null) tfliteOptions!!.numThreads = numThread
     }
     override fun setUseNNAPI(isChecked: Boolean) {
 
