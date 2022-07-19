@@ -16,7 +16,10 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
-import com.anlehu.mmhcods.utils.*
+import com.anlehu.mmhcods.utils.BorderedText
+import com.anlehu.mmhcods.utils.Detector
+import com.anlehu.mmhcods.utils.FileUtil
+import com.anlehu.mmhcods.utils.ImageUtils
 import com.anlehu.mmhcods.views.OverlayView
 import java.io.File
 import java.util.*
@@ -60,7 +63,7 @@ class TestActivity : AppCompatActivity() {
     /********************************************************************************************************
      * Starts activity for result
      ********************************************************************************************************/
-    @RequiresApi(Build.VERSION_CODES.N)
+    @RequiresApi(Build.VERSION_CODES.O)
     var resultStarter = registerForActivityResult(ActivityResultContracts.StartActivityForResult()){ result ->
         if(result.resultCode == Activity.RESULT_OK){
             val data: Intent? = result.data
@@ -73,6 +76,7 @@ class TestActivity : AppCompatActivity() {
     /********************************************************************************************************
      * On create method
      ********************************************************************************************************/
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?){
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_test)
@@ -91,7 +95,7 @@ class TestActivity : AppCompatActivity() {
     /********************************************************************************************************
      * Retrieves all photos within selected directory
      ********************************************************************************************************/
-    @RequiresApi(Build.VERSION_CODES.N)
+    @RequiresApi(Build.VERSION_CODES.O)
     fun gatherPhotos(data: Intent){
 
         /*
@@ -117,7 +121,7 @@ class TestActivity : AppCompatActivity() {
                 or item.toString().endsWith(".jpeg")){
                 Log.d("FILE_ITEM", "$item")
 
-                croppedBitmap = ImageUtils.rescaleImage(null, item.toString())
+                //croppedBitmap = ImageUtils.rescaleImage(null, item.toString())
                 /*
                     Apply testing per image
                 */
@@ -129,7 +133,7 @@ class TestActivity : AppCompatActivity() {
     }
 
 
-    @RequiresApi(Build.VERSION_CODES.N)
+    @RequiresApi(Build.VERSION_CODES.O)
     fun processImage(){
         // run in a background thread
         //runInBackground {
@@ -174,8 +178,8 @@ class TestActivity : AppCompatActivity() {
 
     fun initializeDetectors(){
         try{
-            detector = DetectorFactory.getDetector(assets, MainActivity.MAIN_MODEL_NAME)
-            laneDetector = DetectorFactory.getLaneDetector(assets, MainActivity.LANE_MODEL_NAME)
+           // detector = DetectorFactory.getDetector(MainActivity.MAIN_MODEL_NAME)
+           // laneDetector = DetectorFactory.getLaneDetector(MainActivity.LANE_MODEL_NAME)
         }catch(e: Exception){
             Toast.makeText(this, "Classifier/s can't be initiated", Toast.LENGTH_SHORT).show()
             finish()

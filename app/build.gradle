@@ -7,8 +7,8 @@ android {
     compileSdk 31
 
     defaultConfig {
-        applicationId "com.anlehu.mttvrds"
-        minSdk 21
+        applicationId "com.anlehu.mmhcods"
+        minSdk 24
         targetSdk 31
         versionCode 1
         versionName "1.0"
@@ -65,7 +65,12 @@ dependencies {
 
     implementation 'org.tensorflow:tensorflow-lite:2.4.0'
     implementation 'org.tensorflow:tensorflow-lite-gpu:2.4.0'
+    implementation 'org.tensorflow:tensorflow-lite-support:+'
     implementation 'com.google.android.gms:play-services-mlkit-text-recognition:17.0.0'
+
+    implementation "org.jetbrains.kotlinx:multik-api:0.1.1"
+    implementation "org.jetbrains.kotlinx:multik-jvm:0.1.1"
+
     // OpenCV 4.5.4
-    implementation project(":opencv")
+    implementation project(path: ':opencv')
 }

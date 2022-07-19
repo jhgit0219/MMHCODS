@@ -9,7 +9,7 @@ import android.view.ViewGroup.MarginLayoutParams
 class AutoAdjustView: TextureView {
     var widthRatio = 0
     var heightRatio = 0
-    var keepAspect = true
+    var keepAspect = false
 
     constructor(context: Context): this(context, null)
     constructor(context: Context, attributeSet: AttributeSet?) : this(context, attributeSet!!, 0)

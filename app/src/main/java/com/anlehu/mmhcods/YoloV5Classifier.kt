@@ -36,9 +36,7 @@ import org.tensorflow.lite.Tensor
 import org.tensorflow.lite.gpu.CompatibilityList
 import org.tensorflow.lite.gpu.GpuDelegate
 import org.tensorflow.lite.nnapi.NnApiDelegate
-import java.io.BufferedReader
-import java.io.IOException
-import java.io.InputStreamReader
+import java.io.*
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.MappedByteBuffer
@@ -96,7 +94,7 @@ open class YoloV5Classifier: Detector {
     }
 
     override fun setNumOfThreads(numThread: Int) {
-        if (tfLite != null) tfLite!!.setNumThreads(numThread)
+        if (tfLite != null) tfliteOptions.numThreads = numThread
     }
 
     override fun setUseNNAPI(isChecked: Boolean) {
@@ -236,7 +234,6 @@ open class YoloV5Classifier: Detector {
 //        byteBuffer.order(ByteOrder.nativeOrder());
 //        int[] intValues = new int[INPUT_SIZE * INPUT_SIZE];
         bitmap.getPixels(intValues, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-        val pixel = 0
         imgData!!.rewind()
         for (i in 0 until INPUT_SIZE) {
             for (j in 0 until INPUT_SIZE) {
@@ -249,9 +246,11 @@ open class YoloV5Classifier: Detector {
                 val pixelValue = intValues[i * INPUT_SIZE + j]
                 if (isModelQuantized) {
                     // Quantized model
-                    imgData!!.put((((pixelValue shr 16 and 0xFF) - IMAGE_MEAN) / IMAGE_STD / inp_scale + inp_zero_point) as Byte)
-                    imgData!!.put((((pixelValue shr 8 and 0xFF) - IMAGE_MEAN) / IMAGE_STD / inp_scale + inp_zero_point) as Byte)
-                    imgData!!.put((((pixelValue and 0xFF) - IMAGE_MEAN) / IMAGE_STD / inp_scale + inp_zero_point) as Byte)
+                    imgData!!.put(
+                        (((pixelValue shr 16 and 0xFF) - IMAGE_MEAN) / IMAGE_STD / inp_scale + inp_zero_point).toInt().toByte()
+                    )
+                    imgData!!.put((((pixelValue shr 8 and 0xFF) - IMAGE_MEAN) / IMAGE_STD / inp_scale + inp_zero_point).toInt().toByte())
+                    imgData!!.put((((pixelValue and 0xFF) - IMAGE_MEAN) / IMAGE_STD / inp_scale + inp_zero_point).toInt().toByte())
                 } else { // Float model
                     imgData!!.putFloat(((pixelValue shr 16 and 0xFF) - IMAGE_MEAN) / IMAGE_STD)
                     imgData!!.putFloat(((pixelValue shr 8 and 0xFF) - IMAGE_MEAN) / IMAGE_STD)
@@ -269,14 +268,13 @@ open class YoloV5Classifier: Detector {
         val outputMap: MutableMap<Int?, Any?> = HashMap()
 
         outData!!.rewind()
-        Log.d("DetectImage", "$output_box")
         outputMap[0] = outData
-        Log.d("YoloV5Classifier", "mObjThresh: " + getObjThresh())
         val inputArray: Array<out Any> = arrayOf(imgData as Any)
         tfLite!!.runForMultipleInputsOutputs(inputArray, outputMap)
         val byteBuffer = outputMap[0] as ByteBuffer
         byteBuffer.rewind()
         val detections: ArrayList<Detection> = ArrayList()
+
         val out = Array(1) {
             Array(output_box) {
                 FloatArray(
@@ -319,10 +317,6 @@ open class YoloV5Classifier: Detector {
                 val yPos = out[0][i][1]
                 val w = out[0][i][2]
                 val h = out[0][i][3]
-                Log.d(
-                    "YoloV5Classifier",
-                    "$xPos, $yPos, $w, $h"
-                )
                 val rect = RectF(
                     Math.max(0f, xPos - w / 2),
                     Math.max(0f, yPos - h / 2),
@@ -393,7 +387,7 @@ open class YoloV5Classifier: Detector {
         return true
     }
     companion object{
-
+        var mountedPath = ""
         // Number of threads in the java app
         val NUM_THREADS = 2
         val isNNAPI = false
@@ -408,7 +402,7 @@ open class YoloV5Classifier: Detector {
          */
         @Throws(IOException::class)
         fun create(
-            assetManager: AssetManager,
+            mountedPath: String,
             modelFilename: String?,
             labelFilename: String,
             isQuantized: Boolean,
@@ -416,8 +410,10 @@ open class YoloV5Classifier: Detector {
         ): YoloV5Classifier {
             val d = YoloV5Classifier()
             Log.d("FileName: ", "$modelFilename")
-            val actualFilename = labelFilename.split("file:///android_asset/")[1]
-            val labelsInput = assetManager.open(actualFilename)
+            //replace with OBB
+            // val labelsInput = assetManager.open(actualFilename)
+            Log.d("CREATING MODEL", "$mountedPath/$labelFilename")
+            val labelsInput = FileInputStream(File("$mountedPath/$labelFilename"))
             val br = BufferedReader(InputStreamReader(labelsInput))
             br.forEachLine {
                 Log.d("Label: ", it)
@@ -450,7 +446,7 @@ open class YoloV5Classifier: Detector {
                         this.addDelegate(GpuDelegate(CompatibilityList().bestOptionsForThisDevice))
                     }
                 }
-                d.tfliteModel = ModelUtils.loadModelFile(assetManager, modelFilename)
+                d.tfliteModel = ModelUtils.loadModelFile(mountedPath, modelFilename)
                 d.tfLite = Interpreter(d.tfliteModel!!, options)
             } catch (e: Exception) {
                 throw RuntimeException(e)

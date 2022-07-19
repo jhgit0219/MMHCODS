@@ -44,17 +44,18 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
     private var previewHeight = 0
     private var computingDetection: Boolean = false
 
-
     private var croppedBitmap: Bitmap? = null
     private var laneBitmap: Bitmap? = null
     private var copiedBitmap: Bitmap? = null
 
-    private var DESIRED_PREVIEW_SIZE = Size(1080, 1920)
+    private var DESIRED_PREVIEW_SIZE = Size(720, 1280)
 
     private var MAINTAIN_ASPECT = true
 
     private val dbHelper = DbHelper(this)
     private lateinit var db: SQLiteDatabase
+
+    var mountedPath = ""
 
     /********************************************************************************************************
      * Gets layout id of the camera fragment
@@ -76,18 +77,26 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
     @RequiresApi(Build.VERSION_CODES.N)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        mountedPath = intent.extras!!.getString("path").toString()
+
         createDatabase()
     }
+
+    /********************************************************************************************************
+     * Mounts OBB
+     ********************************************************************************************************/
+
+
     /********************************************************************************************************
      * Create a local writable database that holds list of violations prepared to be uploaded to server
      ********************************************************************************************************/
     @RequiresApi(Build.VERSION_CODES.N)
     private fun createDatabase(){
         db = dbHelper.writableDatabase
-        liveModel.finalViolationsList.observe(this, { list->
+        liveModel.finalViolationsList.observe(this) { list ->
             Log.d("SIZE_LIST", list.size.toString())
             saveDataToDb()
-        })
+        }
     }
     /********************************************************************************************************
      * Override onPreviewSizeChosen method; Creates detector objects used for object detection;
@@ -95,11 +104,13 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
      * Adds a callback to a drawing overlay canvas that draws boxes if any detection occurs
      ********************************************************************************************************/
     override fun onPreviewSizeChosen(size: Size, rotation: Int) {
-
         try{
-            detector = DetectorFactory.getDetector(assets, MainActivity.MAIN_MODEL_NAME)
-            laneDetector = DetectorFactory.getLaneDetector(assets, MainActivity.LANE_MODEL_NAME)
+            // mountedPath is null for some reason.
+            Log.d("MOUNTED_PATH", mountedPath)
+            detector = DetectorFactory.getDetector(mountedPath, MainActivity.MAIN_MODEL_NAME)
+            laneDetector = DetectorFactory.getLaneDetector(mountedPath, MainActivity.LANE_MODEL_NAME)
         }catch(e: Exception){
+            Log.d("Classifier", "$e")
             Toast.makeText(this, "Classifier/s can't be initiated", Toast.LENGTH_SHORT).show()
             finish()
         }
@@ -118,6 +129,8 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
 
         previewWidth = size.width
         previewHeight = size.height
+//        previewWidth = 1280
+//        previewHeight = 720
         Log.d("ORIENTATION:", "$rotation AND ${getScreenOrientation()}")
         sensorOrientation = rotation - getScreenOrientation()
 
@@ -196,17 +209,22 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
         readyForNextImage()                 // close current image and prepare for next frame
 
         val canvas = Canvas(croppedBitmap!!)    // create canvas object using croppedBitmap
-        croppedBitmap = ImageUtils.rescaleImage(rgbFrameBitmap, "")
+        //croppedBitmap = ImageUtils.rescaleImage(rgbFrameBitmap, Size(640, 640),"", 0f, true)
+        //croppedBitmap = Bitmap.createScaledBitmap(rgbFrameBitmap!!, 640, 640, true)
+
+        laneBitmap = ImageUtils.rescaleImage(rgbFrameBitmap, Size(800, 288), "", 90f, false)
 
         // draw on canvas through matrix using rgbFrameBitmap as data values
         canvas.drawBitmap(rgbFrameBitmap!!, frameToCropMat, null)
+        ImageUtils.saveBitmap(croppedBitmap!!, "supposed")
 
         //ImageUtils.saveBitmap(rgbFrameBitmap!!, "preview.png")
 
         // run in a background thread
         runInBackground {
             val results: List<Detection> = detector.detectImage(croppedBitmap!!)
-            val lane  = laneDetector.detectLane(laneBitmap!!)
+            //TODO: Make Lane Detector like how the YoloV5 works
+            val laneResults: List<Detection>  = laneDetector.detectImage(laneBitmap!!)
             copiedBitmap = Bitmap.createBitmap(croppedBitmap!!)
             val canvas1 = Canvas(copiedBitmap!!)
             val paint = Paint()
@@ -234,6 +252,8 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                     mappedPredictions.add(result)               // add result to mappedPredictions
                 }
             }
+            /** Temp**/
+            val lane = floatArrayOf(1.0f)
             tracker.trackResults(mappedPredictions, lane, 0)    // add mappedPredictions to tracker overlay
             trackingOverlay.postInvalidate()
 
