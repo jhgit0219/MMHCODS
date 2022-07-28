@@ -48,7 +48,7 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
     private var laneBitmap: Bitmap? = null
     private var copiedBitmap: Bitmap? = null
 
-    private var DESIRED_PREVIEW_SIZE = Size(720, 1280)
+    private var DESIRED_PREVIEW_SIZE = Size(1080, 1920)
 
     private var MAINTAIN_ASPECT = true
 
@@ -208,14 +208,15 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
 
         readyForNextImage()                 // close current image and prepare for next frame
 
-        val canvas = Canvas(croppedBitmap!!)    // create canvas object using croppedBitmap
+        //val canvas = Canvas(croppedBitmap!!)    // create canvas object using croppedBitmap
         //croppedBitmap = ImageUtils.rescaleImage(rgbFrameBitmap, Size(640, 640),"", 0f, true)
         //croppedBitmap = Bitmap.createScaledBitmap(rgbFrameBitmap!!, 640, 640, true)
+        croppedBitmap = ImageUtils.rescaleImage(rgbFrameBitmap, Size(640, 640), "", 0f, true)
+        laneBitmap = ImageUtils.rescaleImage(rgbFrameBitmap, Size(800, 288), "", 90f, true)
 
-        laneBitmap = ImageUtils.rescaleImage(rgbFrameBitmap, Size(800, 288), "", 90f, false)
 
-        // draw on canvas through matrix using rgbFrameBitmap as data values
-        canvas.drawBitmap(rgbFrameBitmap!!, frameToCropMat, null)
+        // draw on canvas through matrix using rgbFrameBitmap as data values, which will be drawn on croppedBitmap
+        //canvas.drawBitmap(rgbFrameBitmap!!, frameToCropMat, null)
         ImageUtils.saveBitmap(croppedBitmap!!, "supposed")
 
         //ImageUtils.saveBitmap(rgbFrameBitmap!!, "preview.png")
@@ -223,8 +224,17 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
         // run in a background thread
         runInBackground {
             val results: List<Detection> = detector.detectImage(croppedBitmap!!)
+            for(i in results){
+                val str = "left: ${i.location.left} | top: ${i.location.top} | right: ${i.location.right} | bottom: ${i.location.bottom}"
+                when (i.detectedClass) {
+                    0 -> Log.d("MOTOR LOC", str)
+                    1 -> Log.d("HELMET LOC", str)
+                    2 -> Log.d("LP LOC", str)
+                    else -> Log.d("TRI LOC", str)
+                }
+            }
             //TODO: Make Lane Detector like how the YoloV5 works
-            val laneResults: List<Detection>  = laneDetector.detectImage(laneBitmap!!)
+            val laneResults  = laneDetector.detectImage(laneBitmap!!)
             copiedBitmap = Bitmap.createBitmap(croppedBitmap!!)
             val canvas1 = Canvas(copiedBitmap!!)
             val paint = Paint()
@@ -234,7 +244,7 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
 
             val minConfidence = MainActivity.MINIMUM_CONFIDENCE // sets minimum confidence levels for detection
 
-            var mappedPredictions: MutableList<Detection> = LinkedList()    // create a list for detection map
+            var mappedPredictions: MutableList<Detection> = mutableListOf()    // create a list for detection map
 
             /*
                 Go through every result of the object detection
@@ -253,8 +263,7 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                 }
             }
             /** Temp**/
-            val lane = floatArrayOf(1.0f)
-            tracker.trackResults(mappedPredictions, lane, 0)    // add mappedPredictions to tracker overlay
+            tracker.trackResults(mappedPredictions, laneResults, 0)    // add mappedPredictions to tracker overlay
             trackingOverlay.postInvalidate()
 
             // Detect Violations
@@ -289,6 +298,9 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
      * singleton tied to detector activity
      ********************************************************************************************************/
     companion object{
+
+        val outputRangeX = floatArrayOf(0f, 1920f)
+        val outputRangeY = floatArrayOf(0f, 1080f)
 
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 

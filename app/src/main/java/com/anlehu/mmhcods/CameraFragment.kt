@@ -1,6 +1,7 @@
 package com.anlehu.mmhcods
 
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.ImageFormat
 import android.graphics.Matrix
 import android.graphics.RectF
@@ -182,11 +183,11 @@ class CameraFragment() : Fragment() {
             //previewSize = chooseOptimalSize(map!!.getOutputSizes(SurfaceTexture::class.java), inputSize.width, inputSize.height)
             previewSize = Size(1280, 720)
             val orientation = resources.configuration.orientation
-//            if(orientation == Configuration.ORIENTATION_LANDSCAPE){
-//                adjustView.setAspectRatio(previewSize.width, previewSize.height, true)
-//            }else{
-//                adjustView.setAspectRatio(previewSize.height, previewSize.width, true)
-//            }
+            if(orientation == Configuration.ORIENTATION_LANDSCAPE){
+                adjustView.setAspectRatio(previewSize.width, previewSize.height, true)
+            }else{
+                adjustView.setAspectRatio(previewSize.height, previewSize.width, true)
+            }
         }catch(e: Exception){
             throw IllegalStateException(e)
         }

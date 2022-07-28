@@ -1,11 +1,8 @@
 package com.anlehu.mmhcods.utils
 
-import android.graphics.Bitmap
 import android.graphics.RectF
 
 interface Detector {
-
-    fun detectImage(bitmap: Bitmap): ArrayList<Detection>
 
     fun close()
 
@@ -101,7 +98,5 @@ interface Detector {
         }
 
     }
-
-
 
 }

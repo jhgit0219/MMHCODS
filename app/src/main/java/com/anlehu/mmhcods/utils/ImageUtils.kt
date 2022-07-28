@@ -16,6 +16,7 @@ import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 class ImageUtils {
 
@@ -76,7 +77,7 @@ class ImageUtils {
          ********************************************************************************************************/
         fun saveBitmap(bitmap: Bitmap, filename: String) {
             val root = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM).absolutePath
-            Log.i("Saving bitmap to", "${bitmap.width}, ${bitmap.height}, $root")
+            Log.i("Saving bitmap to", "${bitmap.width}, ${bitmap.height}, $root, as $filename")
             val myDir = File(root)
             if (!myDir.mkdirs()) {
                 Log.e("ERROR", "MKDIR FAILED")
@@ -96,15 +97,31 @@ class ImageUtils {
             }
         }
 
+        fun convertToRange(input: Float, inputRange: FloatArray, outputRange: FloatArray): Int{
+
+            return try{
+                var output = (outputRange[0] + ((outputRange[1] - outputRange[0]) / (inputRange[1] - inputRange[0])) * (input - inputRange[0])).roundToInt()
+                if(output < outputRange[0])
+                    output = outputRange[0].toInt()
+                else if(output > outputRange[1])
+                    output = outputRange[1].toInt()
+                output
+            }catch(e: Exception){
+                0
+            }
+
+        }
+
         /********************************************************************************************************
          * Resizes image to fit model input dimensions while adding padding
          ********************************************************************************************************/
         fun rescaleImage(inpBitmap: Bitmap?, size: Size, path: String, rotate: Float, pad: Boolean): Bitmap{
 
-            var bitmap: Bitmap = Bitmap.createBitmap(inpBitmap!!)
+            var bitmap: Bitmap
             var fileName: String
 
             if(pad){
+                Log.d("RESIZING TO", "${size.width} x ${size.height}")
                 if(inpBitmap == null){
                     var opt = BitmapFactory.Options()
                     opt.inPreferredConfig = Bitmap.Config.ARGB_8888
@@ -118,32 +135,36 @@ class ImageUtils {
                 val oldHeight = bitmap.height
                 val oldWidth = bitmap.width
 
-                val ratio = (640.0 / max(oldHeight, oldWidth))
-                val newSize = listOf((oldWidth * ratio), (oldHeight*ratio))
+                val widthRatio = size.width.toDouble() / oldWidth
+                var heightRatio = size.height.toDouble() / oldHeight
+                var ratio = 0.0
+                if(widthRatio <= heightRatio)
+                    ratio = widthRatio
+                else
+                    ratio = heightRatio
+                val newSize = listOf((oldWidth.toDouble() * ratio), (oldHeight.toDouble() * ratio))
 
                 var srcMat = Mat(oldHeight, oldWidth, CvType.CV_8UC4, Scalar(4.0))
                 val dstMat = Mat(size.height, size.width, CvType.CV_8UC4, Scalar(4.0))
 
                 Utils.bitmapToMat(bitmap, srcMat)
-                Log.d("MAT_SIZE", srcMat.cols().toString()+" ratio: $ratio oldHeight: $oldHeight oldWidth: $oldWidth")
+                Log.d("MAT_SIZE", srcMat.cols().toString()+" oldWidth: $oldWidth oldHeight: $oldHeight ")
                 Imgproc.resize(srcMat, dstMat, org.opencv.core.Size(), ratio, ratio, Imgproc.INTER_AREA)
 
-                val deltaW = 640 - newSize[0]
-                val deltaH = 640 - newSize[1]
+                val deltaW = size.width - newSize[0]
+                val deltaH = size.height - newSize[1]
                 val top = deltaH.toInt().floorDiv(2)
                 val bottom = deltaH.toInt() - deltaH.toInt().floorDiv(2)
                 val left = deltaW.toInt().floorDiv(2)
                 val right = deltaW.toInt() - deltaW.toInt().floorDiv(2)
+                Log.d("MAKEBORDER", "top = $top | bottom = $bottom | left = $left | right = $right")
 
                 Core.copyMakeBorder(dstMat, dstMat, top, bottom, left, right, Core.BORDER_CONSTANT, Scalar(0.0, 0.0, 0.0, 255.0))
                 bitmap = Bitmap.createBitmap(dstMat.width(), dstMat.height(), Bitmap.Config.ARGB_8888)
                 Utils.matToBitmap(dstMat, bitmap)
-                saveBitmap(bitmap, fileName)
+//                saveBitmap(bitmap, fileName)
             }else{
-                val mat = Matrix()
-                mat.postRotate(rotate)
-                val rotatedBitmap = Bitmap.createBitmap(inpBitmap, 0, 0, inpBitmap.width, inpBitmap.height, mat, true)
-                bitmap = Bitmap.createScaledBitmap(rotatedBitmap, size.width, size.height, true)
+                bitmap = Bitmap.createScaledBitmap(inpBitmap!!, size.width, size.height, true)
             }
 
             return bitmap

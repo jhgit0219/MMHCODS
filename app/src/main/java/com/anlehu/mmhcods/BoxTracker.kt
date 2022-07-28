@@ -28,9 +28,11 @@ class BoxTracker {
 
     private class TrackedPrediction{
         lateinit var location: RectF
+        lateinit var lanePoints: FloatArray
         var detectionConfidence: Float = 0.0f
         var color: Int = 0
         var title = ""
+        var id: Int = 0
 
     }
 
@@ -59,6 +61,21 @@ class BoxTracker {
         frameHeight = height
         this.sensorOrientation = sensorOrientation
         lanePoints = FloatArray(0)
+
+        val rotated = sensorOrientation % 180 == 90
+        val multiplier = Math.min(
+            1920f / (if (rotated) frameWidth.toFloat() else frameHeight.toFloat()),
+            1080f / (if (rotated) frameHeight.toFloat() else frameWidth.toFloat())
+        )
+        frameToCanvasMat = ImageUtils.getTransformationMatrix(
+            frameWidth,
+            frameHeight,
+            (multiplier * if (rotated) frameHeight else frameWidth).toInt(),
+            (multiplier * if (rotated) frameWidth else frameHeight).toInt(),
+            sensorOrientation,
+            true
+        )
+        frameToCanvasMat = Matrix()
     }
 
     @Synchronized
@@ -82,53 +99,39 @@ class BoxTracker {
 
     @Synchronized
     fun draw(canvas: Canvas) {
-        val rotated = sensorOrientation % 180 == 90
-        val multiplier = Math.min(
-            canvas.height / (if (rotated) frameWidth else frameHeight).toFloat(),
-            canvas.width / (if (rotated) frameHeight else frameWidth).toFloat()
-        )
-        frameToCanvasMat = ImageUtils.getTransformationMatrix(
-            frameWidth,
-            frameHeight,
-            (multiplier * if (rotated) frameHeight else frameWidth).toInt(),
-            (multiplier * if (rotated) frameWidth else frameHeight).toInt(),
-            sensorOrientation,
-            true
-        )
+
         for (recognition in trackedObjects) {
-            val trackedPos = RectF(recognition.location)
-            frameToCanvasMat.mapRect(trackedPos)
-            boxPaint.color = recognition.color
-            val cornerSize = Math.min(trackedPos.width(), trackedPos.height()) / 8.0f
-            canvas.drawRoundRect(trackedPos, cornerSize, cornerSize, boxPaint)
-            val labelString = if (!TextUtils.isEmpty(recognition.title)) String.format(
-                "%s %.2f", recognition.title,
-                100 * recognition.detectionConfidence
-            ) else String.format("%.2f", 100 * recognition.detectionConfidence)
-            //            borderedText.drawText(canvas, trackedPos.left + cornerSize, trackedPos.top,
-            // labelString);
-            borderedText.drawText(
-                canvas, trackedPos.left + cornerSize, trackedPos.top, "$labelString%", boxPaint
-            )
+            if(recognition.id == 1){
+                boxPaint.color = Color.YELLOW
+                Log.d("LANE_DET", "Lane = ${recognition.lanePoints.joinToString(",")}")
+                canvas.drawLines(recognition.lanePoints, boxPaint)
+            }else{
+                val trackedPos = RectF(recognition.location)
+                boxPaint.color = recognition.color
+                val cornerSize = Math.min(trackedPos.width(), trackedPos.height()) / 8.0f
+                canvas.drawRoundRect(trackedPos, cornerSize, cornerSize, boxPaint)
+                val labelString = if (!TextUtils.isEmpty(recognition.title)) String.format(
+                    "%s %.2f", recognition.title,
+                    100 * recognition.detectionConfidence
+                ) else String.format("%.2f", 100 * recognition.detectionConfidence)
+                //            borderedText.drawText(canvas, trackedPos.left + cornerSize, trackedPos.top,
+                // labelString);
+                borderedText.drawText(
+                    canvas, trackedPos.left + cornerSize, trackedPos.top, "$labelString%", boxPaint
+                )
+            }
+
         }
-        boxPaint.color = Color.YELLOW
         //canvas.drawLines(lanePoints, boxPaint)
     }
 
     @Synchronized
-    fun trackResults(results: List<Detection>, lane: FloatArray, timeStamp: Long){
+    fun trackResults(results: List<Detection>, lanes: List<FloatArray>, timeStamp: Long){
         Log.i("BoxTracker:", "${results.size} results from $timeStamp")
-        processResults(results, lane)
-    }
-
-    private fun processResults(results: List<Detection>, lane: FloatArray) {
         // rectangles to track
         val rectsToTrack: MutableList<Pair<Float, Detection>> = LinkedList()
 
-        // set lane points
-        lanePoints = lane
-
-        // clear current rectangles on screen
+        // clear current drawings on screen
         screenRects.clear()
 
         // grab values based on frame to canvas matrix conversion
@@ -150,30 +153,37 @@ class BoxTracker {
         }
 
         trackedObjects.clear()
-        if(rectsToTrack.isEmpty()){
+        if(rectsToTrack.isEmpty() && lanes.isEmpty()){
             // Abort because there's nothing to track
             return
         }
 
+        val colors: Array<Int> = arrayOf(
+            Color.BLUE,
+            Color.RED,
+            Color.GREEN,
+            Color.YELLOW,
+            Color.CYAN,
+            Color.MAGENTA,
+            Color.WHITE
+        )
+
         for(potentialPrediction in rectsToTrack){
-            var trackedPrediction = TrackedPrediction()
+            val trackedPrediction = TrackedPrediction()
             trackedPrediction.detectionConfidence = potentialPrediction.first
             trackedPrediction.location = RectF(potentialPrediction.second.location)
             trackedPrediction.title = potentialPrediction.second.title
-            var colors: Array<Int> = arrayOf(
-                Color.BLUE,
-                Color.RED,
-                Color.GREEN,
-                Color.YELLOW,
-                Color.CYAN,
-                Color.MAGENTA,
-                Color.WHITE
-            )
+
             trackedPrediction.color = colors[potentialPrediction.second.detectedClass % colors.size]
             trackedObjects.add(trackedPrediction)
-
         }
 
+        for(lane in lanes){
+            var trackedPrediction = TrackedPrediction()
+            trackedPrediction.lanePoints = lane
+            trackedPrediction.id = 1
+            trackedObjects.add(trackedPrediction)
+        }
     }
 
     companion object{

@@ -139,7 +139,7 @@ class TestActivity : AppCompatActivity() {
         //runInBackground {
 
             val results: List<Detector.Detection> = detector.detectImage(croppedBitmap!!)
-            val lane  = laneDetector.detectLane(laneBitmap!!)
+            val lane  = laneDetector.detectImage(laneBitmap!!)
             copiedBitmap = Bitmap.createBitmap(croppedBitmap!!)
             val paint = Paint()
             paint.color = Color.BLUE

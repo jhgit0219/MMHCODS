@@ -20,15 +20,14 @@ limitations under the License.
 
 package com.anlehu.mmhcods
 
-import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.graphics.RectF
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
-import com.anlehu.mmhcods.utils.DetectionComparator
 import com.anlehu.mmhcods.utils.Detector
 import com.anlehu.mmhcods.utils.Detector.Detection
+import com.anlehu.mmhcods.utils.ImageUtils
 import com.anlehu.mmhcods.utils.ModelUtils
 import org.checkerframework.checker.nullness.qual.NonNull
 import org.tensorflow.lite.Interpreter
@@ -159,11 +158,25 @@ open class YoloV5Classifier: Detector {
 
     //non maximum suppression
     @RequiresApi(Build.VERSION_CODES.N)
-    open fun nms(list: ArrayList<Detection>): ArrayList<Detection> {
+    fun nms(list: ArrayList<Detection>): ArrayList<Detection> {
+
         val nmsList = ArrayList<Detection>()
+
         for (k in labels.indices) {
-            //1.find max confidence per class
-            val pq: PriorityQueue<Detection> = PriorityQueue<Detection>(DetectionComparator)
+//            //1.find max confidence per class
+//            val pq: PriorityQueue<Detection> = PriorityQueue<Detection>(DetectionComparator)
+//            for (i in list.indices) {
+//                if (list[i].detectedClass == k) {
+//                    pq.add(list[i])
+//                }
+//            }
+
+            val pq: PriorityQueue<Detection> = PriorityQueue(
+                50
+            ) { lhs, rhs -> // Intentionally reversed to put high confidence at the head of the queue.
+                rhs.confidence.compareTo(lhs.confidence)
+            }
+
             for (i in list.indices) {
                 if (list[i].detectedClass == k) {
                     pq.add(list[i])
@@ -176,16 +189,51 @@ open class YoloV5Classifier: Detector {
                 val a: Array<Detection?> = arrayOfNulls(pq.size)
                 val detections: Array<Detection> = pq.toArray(a)
                 val max: Detection = detections[0]
+
+//                val left = ImageUtils.convertToRange(max.location.left, floatArrayOf(0f, 640f), floatArrayOf(0f, 1920f) ).toFloat()
+//                val right = ImageUtils.convertToRange(max.location.right, floatArrayOf(0f, 640f), floatArrayOf(0f, 1920f) ).toFloat()
+//                val bottom = ImageUtils.convertToRange(max.location.bottom, floatArrayOf(140f, 500f), floatArrayOf(0f, 1080f) ).toFloat()
+//                val top  = ImageUtils.convertToRange(max.location.top, floatArrayOf(140f, 500f), floatArrayOf(0f, 1080f) ).toFloat()
+//
+//                max.location.left = left
+//                max.location.right = right
+//                max.location.bottom = bottom
+//                max.location.top = top
+
                 nmsList.add(max)
+
                 pq.clear()
                 for (j in 1 until detections.size) {
                     val detection: Detection = detections[j]
                     val b: RectF = detection.location
                     if (box_iou(max.location, b) < mNmsThresh) {
+                        //before reshape
+                        /*Log.d("RES_BEF", "left: ${detection.location.left} | top: ${detection.location.top} | right: ${detection.location.right} | bottom: ${detection.location.bottom}")
+                        // reshape the detection
+
+                        val left = ImageUtils.convertToRange(detection.location.left, floatArrayOf(0f, 640f), floatArrayOf(0f, 1920f) ).toFloat()
+                        val right = ImageUtils.convertToRange(detection.location.right, floatArrayOf(0f, 640f), floatArrayOf(0f, 1920f) ).toFloat()
+                        val bottom = ImageUtils.convertToRange(detection.location.bottom, floatArrayOf(140f, 500f), floatArrayOf(0f, 1080f) ).toFloat()
+                        val top  = ImageUtils.convertToRange(detection.location.top, floatArrayOf(140f, 500f), floatArrayOf(0f, 1080f) ).toFloat()
+
+                        detection.location.left = left
+                        detection.location.right = right
+                        detection.location.bottom = bottom
+                        detection.location.top = top
+
+                        //After reshape
+                        Log.d("RES_AFT", "left: ${left} | top: ${top} | right: ${right} | bottom: ${bottom}")*/
                         pq.add(detection)
                     }
                 }
             }
+        }
+        //convert ranges in nmsList
+        for(i in nmsList){
+            i.location.left = ImageUtils.convertToRange(i.location.left, inputRangeX, DetectorActivity.outputRangeX).toFloat()
+            i.location.right = ImageUtils.convertToRange(i.location.right, inputRangeX, DetectorActivity.outputRangeX).toFloat()
+            i.location.bottom = ImageUtils.convertToRange(i.location.bottom, inputRangeY, DetectorActivity.outputRangeY).toFloat()
+            i.location.top  = ImageUtils.convertToRange(i.location.top, inputRangeY, DetectorActivity.outputRangeY).toFloat()
         }
         return nmsList
     }
@@ -261,7 +309,7 @@ open class YoloV5Classifier: Detector {
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    override fun detectImage(bitmap: Bitmap): ArrayList<Detection> {
+    fun detectImage(bitmap: Bitmap): ArrayList<Detection> {
 
         convertBitmapToByteBuffer(bitmap)
 
@@ -282,7 +330,6 @@ open class YoloV5Classifier: Detector {
                 )
             }
         }
-        Log.d("YoloV5Classifier", "out[0] detect start")
         for (i in 0 until output_box) {
             for (j in 0 until numClass + 5) {
                 if (isModelQuantized) {
@@ -317,11 +364,12 @@ open class YoloV5Classifier: Detector {
                 val yPos = out[0][i][1]
                 val w = out[0][i][2]
                 val h = out[0][i][3]
+                // Map this rect to a different rect
                 val rect = RectF(
-                    Math.max(0f, xPos - w / 2),
-                    Math.max(0f, yPos - h / 2),
-                    Math.min((bitmap.width - 1).toFloat(), xPos + w / 2),
-                    Math.min((bitmap.height - 1).toFloat(), yPos + h / 2)
+                    Math.max(0f, xPos - w / 2), // left
+                    Math.max(0f, yPos - h / 2), // top
+                    Math.min((bitmap.width - 1).toFloat(), xPos + w / 2), // right
+                    Math.min((bitmap.height - 1).toFloat(), yPos + h / 2) // bottom
                 )
                 detections.add(
                     Detection(
@@ -392,6 +440,9 @@ open class YoloV5Classifier: Detector {
         val NUM_THREADS = 2
         val isNNAPI = false
         val isGPU = true
+        val inputRangeX = floatArrayOf(0f, 640f)
+        val inputRangeY = floatArrayOf(140f, 500f)
+
         /**
          * Initializes a native TensorFlow session for classifying images.
          *

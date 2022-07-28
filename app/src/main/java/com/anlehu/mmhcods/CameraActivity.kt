@@ -147,7 +147,6 @@ abstract class CameraActivity: AppCompatActivity(),
         for(i in planes.indices){
             val byteBuffer = planes[i].buffer
             if(yuvBytes[i] == null){
-                Log.d("CAM_ACT_INFO: ", "fillBuffer: $i at ${byteBuffer.capacity()}")
                 yuvBytes[i] = ByteArray(byteBuffer.capacity())
             }
             byteBuffer.get(yuvBytes[i]!!)
