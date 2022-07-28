@@ -5,4 +5,6 @@ This System is an android deployment system of custom trained AI models that det
 These results are then used to create a violation detection system.
 
 # TODO
-# Finalize lane detection model
+- Finalize screen scaling issue
+
+Go to lanechange branch for more details.
