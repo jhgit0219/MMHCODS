@@ -10,6 +10,7 @@ import android.media.ImageReader
 import android.os.*
 import android.util.Log
 import android.util.Size
+import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -34,6 +35,10 @@ abstract class CameraActivity: AppCompatActivity(),
 
     override fun onCreate(savedInstanceState: Bundle?){
         super.onCreate(null)
+        window.decorView.apply{
+            systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN
+        }
+        setContentView(R.layout.activity_main)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContentView(R.layout.camera_detection_activity)
 

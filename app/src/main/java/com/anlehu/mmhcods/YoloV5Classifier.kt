@@ -230,10 +230,14 @@ open class YoloV5Classifier: Detector {
         }
         //convert ranges in nmsList
         for(i in nmsList){
+            Log.d("NMS_LOC", "Left: ${i.location.left} | Right: ${i.location.right} | Top: ${i.location.top} | " +
+                    "Bottom: ${i.location.bottom}")
             i.location.left = ImageUtils.convertToRange(i.location.left, inputRangeX, DetectorActivity.outputRangeX).toFloat()
             i.location.right = ImageUtils.convertToRange(i.location.right, inputRangeX, DetectorActivity.outputRangeX).toFloat()
             i.location.bottom = ImageUtils.convertToRange(i.location.bottom, inputRangeY, DetectorActivity.outputRangeY).toFloat()
             i.location.top  = ImageUtils.convertToRange(i.location.top, inputRangeY, DetectorActivity.outputRangeY).toFloat()
+            Log.d("NMS_CONV", "Left: ${i.location.left} | Right: ${i.location.right} | Top: ${i.location.top} | " +
+                    "Bottom: ${i.location.bottom}")
         }
         return nmsList
     }
@@ -441,7 +445,7 @@ open class YoloV5Classifier: Detector {
         val isNNAPI = false
         val isGPU = true
         val inputRangeX = floatArrayOf(0f, 640f)
-        val inputRangeY = floatArrayOf(140f, 500f)
+        val inputRangeY = floatArrayOf(0f, 640f)
 
         /**
          * Initializes a native TensorFlow session for classifying images.

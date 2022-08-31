@@ -1,6 +1,8 @@
 package com.anlehu.mmhcods
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.ImageFormat
 import android.graphics.Matrix
@@ -18,6 +20,7 @@ import android.util.Log
 import android.util.Size
 import android.util.SparseIntArray
 import android.view.*
+import androidx.core.app.ActivityCompat
 import androidx.fragment.app.Fragment
 import com.anlehu.mmhcods.views.AutoAdjustView
 import java.util.*
@@ -181,7 +184,7 @@ class CameraFragment() : Fragment() {
 
             sensorOrientation = cameraCharacteristics.get(CameraCharacteristics.SENSOR_ORIENTATION)!!.toInt()
             //previewSize = chooseOptimalSize(map!!.getOutputSizes(SurfaceTexture::class.java), inputSize.width, inputSize.height)
-            previewSize = Size(1280, 720)
+            previewSize = Size(1920, 1080)
             val orientation = resources.configuration.orientation
             if(orientation == Configuration.ORIENTATION_LANDSCAPE){
                 adjustView.setAspectRatio(previewSize.width, previewSize.height, true)
@@ -203,6 +206,13 @@ class CameraFragment() : Fragment() {
         try{
             if(!cameraLock.tryAcquire(3000, TimeUnit.MILLISECONDS)){
                 throw RuntimeException("Timeout while waiting to lock camera")
+            }
+            if (ActivityCompat.checkSelfPermission(
+                    this.requireContext(),
+                    Manifest.permission.CAMERA
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                return
             }
             manager.openCamera(cameraId, stateCallback, backgroundHandler)
         }catch(e: Exception){

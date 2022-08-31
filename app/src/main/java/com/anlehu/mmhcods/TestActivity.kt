@@ -2,7 +2,10 @@ package com.anlehu.mmhcods
 
 import android.app.Activity
 import android.content.Intent
-import android.graphics.*
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.graphics.RectF
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -120,8 +123,11 @@ class TestActivity : AppCompatActivity() {
             if(item.toString().endsWith(".jpg") or item.toString().endsWith(".png")
                 or item.toString().endsWith(".jpeg")){
                 Log.d("FILE_ITEM", "$item")
-
-                //croppedBitmap = ImageUtils.rescaleImage(null, item.toString())
+                val options = BitmapFactory.Options()
+                options.inPreferredConfig = Bitmap.Config.ARGB_8888
+                val loadedBitmap = BitmapFactory.decodeFile(item.path, options)
+                croppedBitmap = ImageUtils.rescaleImage(loadedBitmap,Size(640, 640), item.path, 90f, true)
+                laneBitmap = ImageUtils.rescaleImage(loadedBitmap,Size(800, 288), "lane${item.path}", 0f, true)
                 /*
                     Apply testing per image
                 */
@@ -139,12 +145,12 @@ class TestActivity : AppCompatActivity() {
         //runInBackground {
 
             val results: List<Detector.Detection> = detector.detectImage(croppedBitmap!!)
-            val lane  = laneDetector.detectImage(laneBitmap!!)
+            val laneResults  = laneDetector.detectImage(laneBitmap!!)
             copiedBitmap = Bitmap.createBitmap(croppedBitmap!!)
-            val paint = Paint()
-            paint.color = Color.BLUE
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = 2.0f
+//            val paint = Paint()
+//            paint.color = Color.BLUE
+//            paint.style = Paint.Style.STROKE
+//            paint.strokeWidth = 2.0f
 
             val minConfidence = MainActivity.MINIMUM_CONFIDENCE // sets minimum confidence levels
                                                                 // for detection
@@ -170,7 +176,7 @@ class TestActivity : AppCompatActivity() {
             }
 
             // Detect Violations
-            DetectorActivity.detectViolations(mappedPredictions)
+            DetectorActivity.detectViolations(mappedPredictions, laneResults)
 
             computingDetection = false
         //}

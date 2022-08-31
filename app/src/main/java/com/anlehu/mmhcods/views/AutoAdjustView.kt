@@ -3,6 +3,7 @@ package com.anlehu.mmhcods.views
 import android.content.Context
 import android.util.AttributeSet
 import android.util.Log
+import android.util.Size
 import android.view.TextureView
 import android.view.ViewGroup.MarginLayoutParams
 
@@ -20,6 +21,7 @@ class AutoAdjustView: TextureView {
             throw IllegalArgumentException("Size below 0")
         }
         Log.d("ASPECT", "$width x $height")
+        screenSize = Size(width, height)
         widthRatio = width
         heightRatio = height
         keepAspect = bool
@@ -50,5 +52,14 @@ class AutoAdjustView: TextureView {
                 setMeasuredDimension(height *  widthRatio / heightRatio, height)
             }
         }
+        Log.d("CAM_VIEW SIZE", "$width x $height")
+
+
+
     }
+
+    companion object{
+        var screenSize = Size(0, 0)
+    }
+
 }

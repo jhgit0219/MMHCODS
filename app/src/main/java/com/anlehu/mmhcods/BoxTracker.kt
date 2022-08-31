@@ -8,7 +8,6 @@ import android.util.Pair
 import android.util.TypedValue
 import com.anlehu.mmhcods.utils.BorderedText
 import com.anlehu.mmhcods.utils.Detector.Detection
-import com.anlehu.mmhcods.utils.ImageUtils
 import java.util.*
 
 class BoxTracker {
@@ -60,21 +59,21 @@ class BoxTracker {
         frameWidth = width
         frameHeight = height
         this.sensorOrientation = sensorOrientation
-        lanePoints = FloatArray(0)
-
-        val rotated = sensorOrientation % 180 == 90
-        val multiplier = Math.min(
-            1920f / (if (rotated) frameWidth.toFloat() else frameHeight.toFloat()),
-            1080f / (if (rotated) frameHeight.toFloat() else frameWidth.toFloat())
-        )
-        frameToCanvasMat = ImageUtils.getTransformationMatrix(
-            frameWidth,
-            frameHeight,
-            (multiplier * if (rotated) frameHeight else frameWidth).toInt(),
-            (multiplier * if (rotated) frameWidth else frameHeight).toInt(),
-            sensorOrientation,
-            true
-        )
+//        lanePoints = FloatArray(0)
+//
+//        val rotated = sensorOrientation % 180 == 90
+//        val multiplier = Math.min(
+//            width / (if (rotated) frameWidth.toFloat() else frameHeight.toFloat()),
+//            height / (if (rotated) frameHeight.toFloat() else frameWidth.toFloat())
+//        )
+//        frameToCanvasMat = ImageUtils.getTransformationMatrix(
+//            frameWidth,
+//            frameHeight,
+//            (multiplier * if (rotated) frameHeight else frameWidth).toInt(),
+//            (multiplier * if (rotated) frameWidth else frameHeight).toInt(),
+//            sensorOrientation,
+//            true
+//        )
         frameToCanvasMat = Matrix()
     }
 
@@ -107,6 +106,7 @@ class BoxTracker {
                 canvas.drawLines(recognition.lanePoints, boxPaint)
             }else{
                 val trackedPos = RectF(recognition.location)
+                //val trackedPos = RectF(0f, 0f, 1920f, 1080f)
                 boxPaint.color = recognition.color
                 val cornerSize = Math.min(trackedPos.width(), trackedPos.height()) / 8.0f
                 canvas.drawRoundRect(trackedPos, cornerSize, cornerSize, boxPaint)

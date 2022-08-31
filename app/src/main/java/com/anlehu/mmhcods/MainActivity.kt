@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.os.storage.OnObbStateChangeListener
 import android.os.storage.StorageManager
 import android.util.Log
+import android.view.View
 import android.widget.Button
 import androidx.appcompat.app.AppCompatActivity
 import org.opencv.android.OpenCVLoader
@@ -26,6 +27,9 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         //Open in Landscape
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        window.decorView.apply{
+            systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN
+        }
         setContentView(R.layout.activity_main)
 
         OpenCVLoader.initDebug()

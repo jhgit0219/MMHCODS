@@ -539,8 +539,53 @@ open class LaneClassifier()  : Detector {
             if (points.size >= 4){
                 // create best fit line
                 fitPoints.add(bestFit(points))
+            }else{
+                fitPoints.add(floatArrayOf(138f, 0f, 138f, 0f))
             }
         }
+        detectMode = 0
+        if(detectMode != 0){
+            if(avg_lane.isEmpty()){
+                for(points in fitPoints){
+                    avg_lane.add(mutableListOf(points)) // add a mutable list of the points in initial fit
+                }
+            }else{
+                for(i in avg_lane.indices){
+                    Log.d("FIT_LANE_INDEX", "$i")
+                    if(avg_lane[i].size > 2){
+                        avg_lane[i].removeFirst() // remove first element of a lane list with over 5 previous lanes
+                    }
+                    // compute average between all lanes in this mutablelist of this index
+                    var sum_x0 = fitPoints[i][0]      // sum of x0s
+                    var sum_y0 = fitPoints[i][1]      // sum of y0s
+                    var sum_x1 = fitPoints[i][2]    // sum of x1s
+                    var sum_y1 = fitPoints[i][3]      // sum of y1s
+                    var count = 1f
+
+                    for (lane in avg_lane[i]){
+                        Log.d("FIT_LANE", "${lane.joinToString (" ")}")
+                        sum_x0 += lane[0]
+                        sum_y0 += lane[1]
+                        sum_x1 += lane[2]
+                        sum_y1 += lane[3]
+                        count++
+                    }
+
+                    sum_x0 /= count         // avg of sums
+                    sum_y0 /= count
+                    sum_x1 /= count
+                    sum_y1 /= count
+
+                    // create new FloatArray and add to list
+                    val arr = floatArrayOf(sum_x0, sum_y0, sum_x1, sum_y1)
+                    avg_lane[i].add(arr)
+                    Log.d("FIT_ADD", "${arr.joinToString(" ")}")
+                    fitPoints[i] = arr
+                    Log.d("FIT_DONE", "${fitPoints[i].joinToString(" ")}")
+                }
+            }
+        }
+
         // return list of lane points
         return fitPoints
     }
@@ -576,13 +621,14 @@ open class LaneClassifier()  : Detector {
         // last index is the last y-value, 2nd to the last is the last x-value
         bestFitArr[3] = points[points.size-1]
         //insert last x
-        bestFitArr[2] = ((bestFitArr[3] - b) / m) + 100f
+        bestFitArr[2] = ((bestFitArr[3] - b) / m) //+ 100f
 
         // scale points to image range
         bestFitArr[0] = ImageUtils.convertToRange(bestFitArr[0], inputRangeX, DetectorActivity.outputRangeX).toFloat()
         bestFitArr[1] = ImageUtils.convertToRange(bestFitArr[1], inputRangeY, DetectorActivity.outputRangeY).toFloat()
         bestFitArr[2] = ImageUtils.convertToRange(bestFitArr[2], inputRangeX, DetectorActivity.outputRangeX).toFloat()
         bestFitArr[3] = ImageUtils.convertToRange(bestFitArr[3], inputRangeY, DetectorActivity.outputRangeY).toFloat()
+
 
 //        //determine if line is going to the left or right (from top to bottom)
 //        if(bestFitArr[0] > bestFitArr[2]) { // if x0 is greater than x1
@@ -614,6 +660,8 @@ open class LaneClassifier()  : Detector {
         val inputRangeY = floatArrayOf(0f, 720f)
 
         var mountedPath = ""
+        var detectMode = 0
+        var avg_lane = mutableListOf<MutableList<FloatArray>>()
 
         /**
          * Initializes a native TensorFlow session for classifying images.

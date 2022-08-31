@@ -127,8 +127,8 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
 
         Log.d("CROP_SIZE", "${detector.getInputSize()}")
 
-        previewWidth = size.width
-        previewHeight = size.height
+        previewWidth = 1920
+        previewHeight = 1080
 //        previewWidth = 1280
 //        previewHeight = 720
         Log.d("ORIENTATION:", "$rotation AND ${getScreenOrientation()}")
@@ -267,7 +267,7 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
             trackingOverlay.postInvalidate()
 
             // Detect Violations
-            detectViolations(mappedPredictions)
+            detectViolations(mappedPredictions, laneResults)
 
             computingDetection = false
         }
@@ -315,7 +315,7 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
          ********************************************************************************************************/
 
         @RequiresApi(Build.VERSION_CODES.O)
-        fun detectViolations(results: MutableList<Detection>) {
+        fun detectViolations(results: MutableList<Detection>, laneResults: MutableList<FloatArray>) {
 
             /** Logic will be:
              * 1.) for result in results
@@ -421,18 +421,30 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                     }
 
                     /** Check rect locations for overtaking/counterflowing
-                     *  Currently hardcoded
                      */
 
-                    if(motorcycle.licensePlate != null){
-                        val pointX = 1080 - motorcycle.licensePlate!!.detectedLicense.location.left.toInt() + (motorcycle.licensePlate!!.detectedLicense.location.width().toInt() / 2)
+                    if(laneResults.size != 0){
+                        var pointX = 0
+                        if(motorcycle.licensePlate != null)
+                            pointX = 1080 - motorcycle.licensePlate!!.detectedLicense.location.left.toInt() + (motorcycle.licensePlate!!.detectedLicense.location.width().toInt() / 2)
+                        else{
+                            pointX = 1080 - motorcycle.motorcyclist!!.location.left.toInt() + (motorcycle.motorcyclist!!.location.width().toInt() / 2)
+                        }
                         val pointY = 1920 - motorcycle.motorcyclist!!.location.bottom.toInt()
                         val pointOfReference = Point(pointX, pointY)
                         Log.d("POINT_LP", "$pointX, $pointY")
 
                         // Check if this point is within the path
-                        val a = Point(480, 1000)
-                        val b = Point(0, 640)
+
+                        var index = if(laneResults.size > 1){
+                            1
+                        }else{
+                            0
+                        }
+
+                        val a = Point(laneResults[index][2].toInt(), laneResults[index][3].toInt())
+                        val b = Point(laneResults[index][0].toInt(), laneResults[index][1].toInt())
+
                         val determinant = (b.y - a.y)*(pointOfReference.x - a.x) - (b.x - a.x)*(pointOfReference.y - a.y)
                         Log.d("Determinant", "$determinant")
                         if(determinant == 0){
