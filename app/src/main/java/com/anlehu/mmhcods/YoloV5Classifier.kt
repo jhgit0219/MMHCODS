@@ -23,7 +23,6 @@ package com.anlehu.mmhcods
 import android.graphics.Bitmap
 import android.graphics.RectF
 import android.os.Build
-import android.util.Log
 import androidx.annotation.RequiresApi
 import com.anlehu.mmhcods.utils.Detector
 import com.anlehu.mmhcods.utils.Detector.Detection
@@ -208,7 +207,7 @@ open class YoloV5Classifier: Detector {
                     val b: RectF = detection.location
                     if (box_iou(max.location, b) < mNmsThresh) {
                         //before reshape
-                        /*Log.d("RES_BEF", "left: ${detection.location.left} | top: ${detection.location.top} | right: ${detection.location.right} | bottom: ${detection.location.bottom}")
+                        /*//Log.d("RES_BEF", "left: ${detection.location.left} | top: ${detection.location.top} | right: ${detection.location.right} | bottom: ${detection.location.bottom}")
                         // reshape the detection
 
                         val left = ImageUtils.convertToRange(detection.location.left, floatArrayOf(0f, 640f), floatArrayOf(0f, 1920f) ).toFloat()
@@ -222,7 +221,7 @@ open class YoloV5Classifier: Detector {
                         detection.location.top = top
 
                         //After reshape
-                        Log.d("RES_AFT", "left: ${left} | top: ${top} | right: ${right} | bottom: ${bottom}")*/
+                        //Log.d("RES_AFT", "left: ${left} | top: ${top} | right: ${right} | bottom: ${bottom}")*/
                         pq.add(detection)
                     }
                 }
@@ -230,14 +229,14 @@ open class YoloV5Classifier: Detector {
         }
         //convert ranges in nmsList
         for(i in nmsList){
-            Log.d("NMS_LOC", "Left: ${i.location.left} | Right: ${i.location.right} | Top: ${i.location.top} | " +
-                    "Bottom: ${i.location.bottom}")
+            //Log.d("NMS_LOC", "Left: ${i.location.left} | Right: ${i.location.right} | Top: ${i.location.top} | " +
+//                    "Bottom: ${i.location.bottom}")
             i.location.left = ImageUtils.convertToRange(i.location.left, inputRangeX, DetectorActivity.outputRangeX).toFloat()
             i.location.right = ImageUtils.convertToRange(i.location.right, inputRangeX, DetectorActivity.outputRangeX).toFloat()
             i.location.bottom = ImageUtils.convertToRange(i.location.bottom, inputRangeY, DetectorActivity.outputRangeY).toFloat()
             i.location.top  = ImageUtils.convertToRange(i.location.top, inputRangeY, DetectorActivity.outputRangeY).toFloat()
-            Log.d("NMS_CONV", "Left: ${i.location.left} | Right: ${i.location.right} | Top: ${i.location.top} | " +
-                    "Bottom: ${i.location.bottom}")
+            //Log.d("NMS_CONV", "Left: ${i.location.left} | Right: ${i.location.right} | Top: ${i.location.top} | " +
+//                    "Bottom: ${i.location.bottom}")
         }
         return nmsList
     }
@@ -429,11 +428,11 @@ open class YoloV5Classifier: Detector {
         val temp2 = pred_coor[3] - pred_coor[1]
         val temp = temp1 * temp2
         if (temp < 0) {
-            Log.e("checkInvalidateBox", "temp < 0")
+            //Log.e("checkInvalidateBox", "temp < 0")
             return false
         }
         if (Math.sqrt(temp.toDouble()) > Float.MAX_VALUE) {
-            Log.e("checkInvalidateBox", "temp max")
+            //Log.e("checkInvalidateBox", "temp max")
             return false
         }
         return true
@@ -445,7 +444,7 @@ open class YoloV5Classifier: Detector {
         val isNNAPI = false
         val isGPU = true
         val inputRangeX = floatArrayOf(0f, 640f)
-        val inputRangeY = floatArrayOf(0f, 640f)
+        val inputRangeY = floatArrayOf(140f, 500f)
 
         /**
          * Initializes a native TensorFlow session for classifying images.
@@ -464,14 +463,14 @@ open class YoloV5Classifier: Detector {
             inputSize: Int
         ): YoloV5Classifier {
             val d = YoloV5Classifier()
-            Log.d("FileName: ", "$modelFilename")
+            //Log.d("FileName: ", "$modelFilename")
             //replace with OBB
             // val labelsInput = assetManager.open(actualFilename)
-            Log.d("CREATING MODEL", "$mountedPath/$labelFilename")
+            //Log.d("CREATING MODEL", "$mountedPath/$labelFilename")
             val labelsInput = FileInputStream(File("$mountedPath/$labelFilename"))
             val br = BufferedReader(InputStreamReader(labelsInput))
             br.forEachLine {
-                Log.d("Label: ", it)
+                //Log.d("Label: ", it)
                 d.labels.add(it)
             }
             br.close()
@@ -507,7 +506,7 @@ open class YoloV5Classifier: Detector {
                 throw RuntimeException(e)
             }
             d.isModelQuantized = isQuantized
-            Log.d("YoloV5Classifier", "Quantized: $isQuantized")
+            //Log.d("YoloV5Classifier", "Quantized: $isQuantized")
             // Pre-allocate buffers.
             val numBytesPerChannel: Int = if (isQuantized) {
                 1 // Quantized
@@ -520,7 +519,7 @@ open class YoloV5Classifier: Detector {
             d.intValues = IntArray(d.INPUT_SIZE * d.INPUT_SIZE)
             d.output_box =
                 (((inputSize / 32.0f).pow(2.0f) + (inputSize / 16.0f).pow(2.0f) + (inputSize / 8.0f).pow(2.0f)) * 3).toInt()
-            Log.d("ImgData", "${d.INPUT_SIZE}")
+            //Log.d("ImgData", "${d.INPUT_SIZE}")
             if (d.isModelQuantized) {
                 val inpten: Tensor = d.tfLite!!.getInputTensor(0)
                 d.inp_scale = inpten.quantizationParams().scale
@@ -531,7 +530,7 @@ open class YoloV5Classifier: Detector {
             }
             val shape: IntArray = d.tfLite!!.getOutputTensor(0).shape()
             val numClass = shape[shape.size - 1] - 5
-            Log.d("NumClass", "$numClass")
+            //Log.d("NumClass", "$numClass")
             d.numClass = numClass
             d.outData = ByteBuffer.allocateDirect(d.output_box * (numClass + 5) * numBytesPerChannel)
             d.outData!!.order(ByteOrder.nativeOrder())

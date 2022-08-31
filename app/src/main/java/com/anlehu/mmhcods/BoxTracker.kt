@@ -3,7 +3,6 @@ package com.anlehu.mmhcods
 import android.content.Context
 import android.graphics.*
 import android.text.TextUtils
-import android.util.Log
 import android.util.Pair
 import android.util.TypedValue
 import com.anlehu.mmhcods.utils.BorderedText
@@ -102,9 +101,10 @@ class BoxTracker {
         for (recognition in trackedObjects) {
             if(recognition.id == 1){
                 boxPaint.color = Color.YELLOW
-                Log.d("LANE_DET", "Lane = ${recognition.lanePoints.joinToString(",")}")
+                //Log.d("LANE_DET", "Lane = ${recognition.lanePoints.joinToString(",")}")
                 canvas.drawLines(recognition.lanePoints, boxPaint)
             }else{
+
                 val trackedPos = RectF(recognition.location)
                 //val trackedPos = RectF(0f, 0f, 1920f, 1080f)
                 boxPaint.color = recognition.color
@@ -127,7 +127,6 @@ class BoxTracker {
 
     @Synchronized
     fun trackResults(results: List<Detection>, lanes: List<FloatArray>, timeStamp: Long){
-        Log.i("BoxTracker:", "${results.size} results from $timeStamp")
         // rectangles to track
         val rectsToTrack: MutableList<Pair<Float, Detection>> = LinkedList()
 
@@ -135,13 +134,15 @@ class BoxTracker {
         screenRects.clear()
 
         // grab values based on frame to canvas matrix conversion
-        var rgbFrameToScreen = Matrix(frameToCanvasMat)
+        //var rgbFrameToScreen = Matrix(frameToCanvasMat)
 
         for(result in results){
 
             val detFrameRect = RectF(result.location)
+//            Log.d("NMS_TRACK", "Left: ${result.location.left} | Right: ${result.location.right} | Top: ${result.location.top} | " +
+//                    "Bottom: ${result.location.bottom}")
             val detScreenRect = RectF()
-            rgbFrameToScreen.mapRect(detScreenRect, detFrameRect)
+            //rgbFrameToScreen.mapRect(detScreenRect, detFrameRect)
             screenRects.add(Pair<Float, RectF>(result.confidence, detScreenRect))
             rectsToTrack.add(Pair<Float, Detection>(result.confidence, result))
 

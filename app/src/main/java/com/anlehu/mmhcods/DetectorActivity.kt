@@ -94,7 +94,7 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
     private fun createDatabase(){
         db = dbHelper.writableDatabase
         liveModel.finalViolationsList.observe(this) { list ->
-            Log.d("SIZE_LIST", list.size.toString())
+            //Log.d("SIZE_LIST", list.size.toString())
             saveDataToDb()
         }
     }
@@ -106,11 +106,11 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
     override fun onPreviewSizeChosen(size: Size, rotation: Int) {
         try{
             // mountedPath is null for some reason.
-            Log.d("MOUNTED_PATH", mountedPath)
+            //Log.d("MOUNTED_PATH", mountedPath)
             detector = DetectorFactory.getDetector(mountedPath, MainActivity.MAIN_MODEL_NAME)
             laneDetector = DetectorFactory.getLaneDetector(mountedPath, MainActivity.LANE_MODEL_NAME)
         }catch(e: Exception){
-            Log.d("Classifier", "$e")
+            //Log.d("Classifier", "$e")
             Toast.makeText(this, "Classifier/s can't be initiated", Toast.LENGTH_SHORT).show()
             finish()
         }
@@ -125,16 +125,16 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
         val inputWidth = laneDetector.INPUT_WIDTH
         val inputHeight = laneDetector.INPUT_HEIGHT
 
-        Log.d("CROP_SIZE", "${detector.getInputSize()}")
+        //Log.d("CROP_SIZE", "${detector.getInputSize()}")
 
         previewWidth = 1920
         previewHeight = 1080
 //        previewWidth = 1280
 //        previewHeight = 720
-        Log.d("ORIENTATION:", "$rotation AND ${getScreenOrientation()}")
+        //Log.d("ORIENTATION:", "$rotation AND ${getScreenOrientation()}")
         sensorOrientation = rotation - getScreenOrientation()
 
-        Log.d("CAM_SIZE", "Initializing at $previewWidth x $previewHeight")
+        //Log.d("CAM_SIZE", "Initializing at $previewWidth x $previewHeight")
         rgbFrameBitmap = Bitmap.createBitmap(previewWidth, previewHeight, Bitmap.Config.ARGB_8888)
         croppedBitmap = Bitmap.createBitmap(cropSize, cropSize, Bitmap.Config.ARGB_8888)
         laneBitmap = Bitmap.createBitmap(inputWidth, inputHeight, Bitmap.Config.ARGB_8888)
@@ -183,7 +183,7 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                 put(ViolationEntry.COL_LP, if(violation.licensePlate != null) violation.licensePlate!!.licenseNumber else "")
             }
             val newRowId = db.insert(ViolationEntry.TABLE_NAME, null, values)
-            Log.d("DATABASE_OP", "Inserted $newRowId")
+            //Log.d("DATABASE_OP", "Inserted $newRowId")
             liveModel.removeFromFinalViolationsList(violation)
         }
     }
@@ -202,7 +202,7 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
             return                          // return from function
         }
         computingDetection = true           // set computingDetection to true
-        Log.d("Processing Image", "$previewWidth x $previewHeight")
+        //Log.d("Processing Image", "$previewWidth x $previewHeight")
         // set pixels of rgbFrameBitmap
         rgbFrameBitmap!!.setPixels(getRGBBytes(), 0, previewWidth, 0, 0, previewWidth, previewHeight)
 
@@ -224,15 +224,15 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
         // run in a background thread
         runInBackground {
             val results: List<Detection> = detector.detectImage(croppedBitmap!!)
-            for(i in results){
-                val str = "left: ${i.location.left} | top: ${i.location.top} | right: ${i.location.right} | bottom: ${i.location.bottom}"
-                when (i.detectedClass) {
-                    0 -> Log.d("MOTOR LOC", str)
-                    1 -> Log.d("HELMET LOC", str)
-                    2 -> Log.d("LP LOC", str)
-                    else -> Log.d("TRI LOC", str)
-                }
-            }
+//            for(i in results){
+//                val str = "left: ${i.location.left} | top: ${i.location.top} | right: ${i.location.right} | bottom: ${i.location.bottom}"
+//                when (i.detectedClass) {
+//                    0 -> Log.d("MOTOR LOC", str)
+//                    1 -> Log.d("HELMET LOC", str)
+//                    2 -> Log.d("LP LOC", str)
+//                    else -> Log.d("TRI LOC", str)
+//                }
+//            }
             //TODO: Make Lane Detector like how the YoloV5 works
             val laneResults  = laneDetector.detectImage(laneBitmap!!)
             copiedBitmap = Bitmap.createBitmap(croppedBitmap!!)
@@ -252,12 +252,12 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
             for (result in results) {
                 val location: RectF = result.location           // get RectF location of detected object in image if any
 
-                Log.d("DETECTION",result.detectedClass.toString())
+                //Log.d("DETECTION",result.detectedClass.toString())
 
                 // if location is not null and the detection confidence is over threshold, then...
                 if (location != null && result.confidence >= minConfidence) {
                     //canvas1.drawRect(location, paint)           // draw on canvas1 for the location of detected object
-                    cropToFrameMat.mapRect(location)            // add location rects to cropToFrameMat
+                   // cropToFrameMat.mapRect(location)            // add location rects to cropToFrameMat
                     //result.location = location
                     mappedPredictions.add(result)               // add result to mappedPredictions
                 }
@@ -348,7 +348,7 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                         motorcycleObject.motorcyclist = result                      // set the motorcyclist object
                         motorcycleObject.dateTime = FileUtil.DateToString(FileUtil.getDateTime())          // set datetime of violation
                         motorcycleList.add(motorcycleObject)                        // add moto object to list
-                        Log.d("MOTOR_DETECTED:", motorcycleList.size.toString())
+                        //Log.d("MOTOR_DETECTED:", motorcycleList.size.toString())
                     }
 
                     if(result.detectedClass == 1){
@@ -361,7 +361,7 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                     }
                     if(result.detectedClass == 3){
                         tricycleList.add(result)                                    // add current tricycle in list
-                        Log.d("TRIKE_LOC", "Found Tricycle")
+                        //Log.d("TRIKE_LOC", "Found Tricycle")
                     }
                 }
                 /**
@@ -373,7 +373,7 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                     // Within the rects of half of the left side of the tricycle. Otherwise, it's most likely a tricycle.
                     for(tricycle in tricycleList){
 
-                        Log.d("TRICYCLE_LOC", "${tricycle.location.right}, ${tricycle.location.top}")
+                        //Log.d("TRICYCLE_LOC", "${tricycle.location.right}, ${tricycle.location.top}")
                         // Create new Rect for tricycle consideration threshold
                         val thresholdPoint = (tricycle.location.top - tricycle.location.bottom)/2
 
@@ -388,11 +388,11 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                         }
                     }
                     if(isTricycle){
-                        Log.d("TRICYCLE", "Detection is a Tricycle")
+                        //Log.d("TRICYCLE", "Detection is a Tricycle")
                         //Skip everything below if isTricycle
                         continue
                     }else{
-                        Log.d("TRICYCLE", "Detection is not a tricycle")
+                        //Log.d("TRICYCLE", "Detection is not a tricycle")
                     }
                     for(helmet in helmetList){
                         // Check if helmet is within upper 1/3 of motorcycle rect. Image is in landscape
@@ -426,13 +426,13 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                     if(laneResults.size != 0){
                         var pointX = 0
                         if(motorcycle.licensePlate != null)
-                            pointX = 1080 - motorcycle.licensePlate!!.detectedLicense.location.left.toInt() + (motorcycle.licensePlate!!.detectedLicense.location.width().toInt() / 2)
+                            pointX = (motorcycle.licensePlate!!.detectedLicense.location.left.toInt() + (motorcycle.licensePlate!!.detectedLicense.location.width().toInt() / 2))
                         else{
-                            pointX = 1080 - motorcycle.motorcyclist!!.location.left.toInt() + (motorcycle.motorcyclist!!.location.width().toInt() / 2)
+                            pointX = (motorcycle.motorcyclist!!.location.left.toInt() + (motorcycle.motorcyclist!!.location.width().toInt() / 2))
                         }
-                        val pointY = 1920 - motorcycle.motorcyclist!!.location.bottom.toInt()
+                        val pointY = -motorcycle.motorcyclist!!.location.bottom.toInt()
                         val pointOfReference = Point(pointX, pointY)
-                        Log.d("POINT_LP", "$pointX, $pointY")
+                        Log.d("COUNTERFLOW_LP", "$pointX, $pointY")
 
                         // Check if this point is within the path
 
@@ -442,15 +442,15 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                             0
                         }
 
-                        val a = Point(laneResults[index][2].toInt(), laneResults[index][3].toInt())
-                        val b = Point(laneResults[index][0].toInt(), laneResults[index][1].toInt())
-
+                        val a = Point(laneResults[index][2].toInt(), -laneResults[index][3].toInt())
+                        val b = Point(laneResults[index][0].toInt(), -laneResults[index][1].toInt())
+                        Log.d("COUNTERFLOW_LANE", "(${b.x}, ${b.y}) , (${a.x}, ${a.y})")
                         val determinant = (b.y - a.y)*(pointOfReference.x - a.x) - (b.x - a.x)*(pointOfReference.y - a.y)
                         Log.d("Determinant", "$determinant")
                         if(determinant == 0){
-                            Log.d("LANE_CLASS", "Point is on line")
-                        }else if(determinant < 0){
-                            Log.d("PROC_VIOL", "COUNTERFLOWING DETECTED")
+                            Log.d("COUNTERFLOW_DET", "Point is on line")
+                        }else if(determinant > 0){
+                            Log.d("COUNTERFLOW_DET", "COUNTERFLOWING DETECTED")
                         }
                     }
                     /**
@@ -489,7 +489,7 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                         if(!potAddedToFinal){
                             if((FileUtil.elapsedTime(FileUtil.stringToDate(potViolator.dateTime), refTime) >= 2.0)){
                                 liveModel.removeFromPotentialViolationsList(potViolator)
-                                Log.d("NO_VIOL", "No violators detected within current frame")
+                                //Log.d("NO_VIOL", "No violators detected within current frame")
                             }
                         }
                     }
@@ -500,7 +500,7 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                      */
 
                     if(motorcycle.helmet == null && !motorcycle.potentialViolation && !motorcycle.finalViolation){
-                        Log.d("MOTOR_DETECTED", "HELMET NOT FOUND, PLACING IN POTENTIAL")
+                        //Log.d("MOTOR_DETECTED", "HELMET NOT FOUND, PLACING IN POTENTIAL")
                         motorcycle.potentialViolation = true
                         motorcycle.offense = "no helmet"
                         liveModel.addToPotentialViolationsList(motorcycle)
@@ -520,12 +520,12 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                 Runnable{
                     //readLp(potViolator) redundant?
                     if(!liveModel.getReportedList()!!.contains(potViolator.licensePlate!!.licenseNumber)){
-                        Log.d("PROC_VIOL", "ADDING LICENSE ${potViolator.licensePlate!!.licenseNumber}" )
+                        //Log.d("PROC_VIOL", "ADDING LICENSE ${potViolator.licensePlate!!.licenseNumber}" )
                         liveModel.addToReportedList(potViolator.licensePlate!!.licenseNumber)
                         potViolator.finalViolation = true
                         liveModel.addToFinalViolationsList(potViolator)
                     }else{
-                        Log.d("PROC_VIOL", "LICENSE ALREADY PREPARED FOR REPORT" )
+                        //Log.d("PROC_VIOL", "LICENSE ALREADY PREPARED FOR REPORT" )
                     }
                 }.run()
                 /**
@@ -533,7 +533,7 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                  * 1.) ADD CHECKER FOR NETWORK CONFIG. IF NETWORK WORKS
                  */
             }else{
-                Log.d("PROC_VIOL", "No LP detected")
+                //Log.d("PROC_VIOL", "No LP detected")
             }
 
         }
@@ -580,13 +580,13 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                         val replace = text.text.replace("\\s".toRegex(), "")
                         // Valid Philippine License Plate Numbers length, both Temporary and Permanent
                         if(replace.length == 6 || replace.length == 7 || replace.length == 11 || replace.length == 12 ){
-                            Log.d("LP_READ", text.text)
+                            //Log.d("LP_READ", text.text)
                             motorcycleObject.licensePlate!!.licenseNumber = text.text
                         }
                     }
                 }
                 .addOnFailureListener {e->
-                    Log.d("LP_READ", e.toString())
+                    //Log.d("LP_READ", e.toString())
                 }
 
         }
