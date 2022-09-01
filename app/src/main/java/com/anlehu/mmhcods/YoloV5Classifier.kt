@@ -125,7 +125,7 @@ open class YoloV5Classifier: Detector {
     }
 
     override fun getObjThresh(): Float {
-        return MainActivity.MINIMUM_CONFIDENCE
+        return ModelUtils.MINIMUM_CONFIDENCE
     }
 
     // Float model
@@ -189,39 +189,13 @@ open class YoloV5Classifier: Detector {
                 val detections: Array<Detection> = pq.toArray(a)
                 val max: Detection = detections[0]
 
-//                val left = ImageUtils.convertToRange(max.location.left, floatArrayOf(0f, 640f), floatArrayOf(0f, 1920f) ).toFloat()
-//                val right = ImageUtils.convertToRange(max.location.right, floatArrayOf(0f, 640f), floatArrayOf(0f, 1920f) ).toFloat()
-//                val bottom = ImageUtils.convertToRange(max.location.bottom, floatArrayOf(140f, 500f), floatArrayOf(0f, 1080f) ).toFloat()
-//                val top  = ImageUtils.convertToRange(max.location.top, floatArrayOf(140f, 500f), floatArrayOf(0f, 1080f) ).toFloat()
-//
-//                max.location.left = left
-//                max.location.right = right
-//                max.location.bottom = bottom
-//                max.location.top = top
-
                 nmsList.add(max)
 
                 pq.clear()
                 for (j in 1 until detections.size) {
                     val detection: Detection = detections[j]
                     val b: RectF = detection.location
-                    if (box_iou(max.location, b) < mNmsThresh) {
-                        //before reshape
-                        /*//Log.d("RES_BEF", "left: ${detection.location.left} | top: ${detection.location.top} | right: ${detection.location.right} | bottom: ${detection.location.bottom}")
-                        // reshape the detection
-
-                        val left = ImageUtils.convertToRange(detection.location.left, floatArrayOf(0f, 640f), floatArrayOf(0f, 1920f) ).toFloat()
-                        val right = ImageUtils.convertToRange(detection.location.right, floatArrayOf(0f, 640f), floatArrayOf(0f, 1920f) ).toFloat()
-                        val bottom = ImageUtils.convertToRange(detection.location.bottom, floatArrayOf(140f, 500f), floatArrayOf(0f, 1080f) ).toFloat()
-                        val top  = ImageUtils.convertToRange(detection.location.top, floatArrayOf(140f, 500f), floatArrayOf(0f, 1080f) ).toFloat()
-
-                        detection.location.left = left
-                        detection.location.right = right
-                        detection.location.bottom = bottom
-                        detection.location.top = top
-
-                        //After reshape
-                        //Log.d("RES_AFT", "left: ${left} | top: ${top} | right: ${right} | bottom: ${bottom}")*/
+                    if (ModelUtils.box_iou(max.location, b) < mNmsThresh) {
                         pq.add(detection)
                     }
                 }
@@ -229,50 +203,15 @@ open class YoloV5Classifier: Detector {
         }
         //convert ranges in nmsList
         for(i in nmsList){
-            //Log.d("NMS_LOC", "Left: ${i.location.left} | Right: ${i.location.right} | Top: ${i.location.top} | " +
-//                    "Bottom: ${i.location.bottom}")
             i.location.left = ImageUtils.convertToRange(i.location.left, inputRangeX, DetectorActivity.outputRangeX).toFloat()
             i.location.right = ImageUtils.convertToRange(i.location.right, inputRangeX, DetectorActivity.outputRangeX).toFloat()
             i.location.bottom = ImageUtils.convertToRange(i.location.bottom, inputRangeY, DetectorActivity.outputRangeY).toFloat()
             i.location.top  = ImageUtils.convertToRange(i.location.top, inputRangeY, DetectorActivity.outputRangeY).toFloat()
-            //Log.d("NMS_CONV", "Left: ${i.location.left} | Right: ${i.location.right} | Top: ${i.location.top} | " +
-//                    "Bottom: ${i.location.bottom}")
         }
         return nmsList
     }
 
     private val mNmsThresh = 0.6f
-
-    fun box_iou(a: RectF, b: RectF): Float {
-        return box_intersection(a, b) / box_union(a, b)
-    }
-
-    fun box_intersection(a: RectF, b: RectF): Float {
-        val w: Float = overlap(
-            (a.left + a.right) / 2, a.right - a.left,
-            (b.left + b.right) / 2, b.right - b.left
-        )
-        val h: Float = overlap(
-            (a.top + a.bottom) / 2, a.bottom - a.top,
-            (b.top + b.bottom) / 2, b.bottom - b.top
-        )
-        return if (w < 0.0 || h < 0.0) 0f else (w * h)
-    }
-
-    fun box_union(a: RectF, b: RectF): Float {
-        val i = box_intersection(a, b)
-        return (a.right - a.left) * (a.bottom - a.top) + (b.right - b.left) * (b.bottom - b.top) - i
-    }
-
-    fun overlap(x1: Float, w1: Float, x2: Float, w2: Float): Float {
-        val l1 = x1 - w1 / 2
-        val l2 = x2 - w2 / 2
-        val left = if (l1 > l2) l1 else l2
-        val r1 = x1 + w1 / 2
-        val r2 = x2 + w2 / 2
-        val right = if (r1 < r2) r1 else r2
-        return right - left
-    }
 
     protected val BATCH_SIZE = 1
     protected val PIXEL_SIZE = 3

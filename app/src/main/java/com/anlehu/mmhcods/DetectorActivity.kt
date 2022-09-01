@@ -78,24 +78,46 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         mountedPath = intent.extras!!.getString("path").toString()
-
         createDatabase()
     }
 
-    /********************************************************************************************************
-     * Mounts OBB
-     ********************************************************************************************************/
 
-
-    /********************************************************************************************************
-     * Create a local writable database that holds list of violations prepared to be uploaded to server
-     ********************************************************************************************************/
     @RequiresApi(Build.VERSION_CODES.N)
     private fun createDatabase(){
         db = dbHelper.writableDatabase
         liveModel.finalViolationsList.observe(this) { list ->
             //Log.d("SIZE_LIST", list.size.toString())
             saveDataToDb()
+        }
+    }
+
+    private fun closeDb(){
+        dbHelper.close()
+    }
+
+    /********************************************************************************************************
+     * Create a table if it does not exist
+     ********************************************************************************************************/
+
+    /********************************************************************************************************
+     * Function that saves data to database
+     ********************************************************************************************************/
+    @RequiresApi(Build.VERSION_CODES.N)
+    @Synchronized
+    fun saveDataToDb(){
+        val violationList = liveModel.getFinalViolationsList()!!
+        for(violation in violationList){
+            val values = ContentValues().apply{
+                put(ViolationEntry.COL_TIMESTAMP, Calendar.getInstance().time.toString())
+                put(ViolationEntry.COL_LOC, "Lapu-Lapu City")
+                put(ViolationEntry.COL_SNAPSHOT, "thislocation")
+                put(ViolationEntry.COL_HELMET, violation.offenseHelmet)
+                put(ViolationEntry.COL_COUNTERFLOW, violation.offenseCounterflow)
+                put(ViolationEntry.COL_LP, if(violation.licensePlate != null) violation.licensePlate!!.licenseNumber else "")
+            }
+            val newRowId = db.insert(ViolationEntry.TABLE_NAME, null, values)
+            //Log.d("DATABASE_OP", "Inserted $newRowId")
+            liveModel.removeFromFinalViolationsList(violation)
         }
     }
     /********************************************************************************************************
@@ -107,8 +129,8 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
         try{
             // mountedPath is null for some reason.
             //Log.d("MOUNTED_PATH", mountedPath)
-            detector = DetectorFactory.getDetector(mountedPath, MainActivity.MAIN_MODEL_NAME)
-            laneDetector = DetectorFactory.getLaneDetector(mountedPath, MainActivity.LANE_MODEL_NAME)
+            detector = DetectorFactory.getDetector(mountedPath, ModelUtils.MAIN_MODEL_NAME)
+            laneDetector = DetectorFactory.getLaneDetector(mountedPath, ModelUtils.LANE_MODEL_NAME)
         }catch(e: Exception){
             //Log.d("Classifier", "$e")
             Toast.makeText(this, "Classifier/s can't be initiated", Toast.LENGTH_SHORT).show()
@@ -165,29 +187,6 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
 
         tracker.setFrameConfig(previewWidth, previewHeight, sensorOrientation)
     }
-
-    /********************************************************************************************************
-     * Function that saves data to database
-     ********************************************************************************************************/
-
-    @RequiresApi(Build.VERSION_CODES.N)
-    @Synchronized
-    fun saveDataToDb(){
-        val violationList = liveModel.getFinalViolationsList()!!
-        for(violation in violationList){
-            val values = ContentValues().apply{
-                put(ViolationEntry.COL_TIMESTAMP, Calendar.getInstance().time.toString())
-                put(ViolationEntry.COL_LOC, "Lapu-Lapu City")
-                put(ViolationEntry.COL_SNAPSHOT, "thislocation")
-                put(ViolationEntry.COL_OFFENSE, violation.offense)
-                put(ViolationEntry.COL_LP, if(violation.licensePlate != null) violation.licensePlate!!.licenseNumber else "")
-            }
-            val newRowId = db.insert(ViolationEntry.TABLE_NAME, null, values)
-            //Log.d("DATABASE_OP", "Inserted $newRowId")
-            liveModel.removeFromFinalViolationsList(violation)
-        }
-    }
-
     /********************************************************************************************************
      * Processes image for detection
      ********************************************************************************************************/
@@ -242,7 +241,7 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
             paint.style = Paint.Style.STROKE
             paint.strokeWidth = 2.0f
 
-            val minConfidence = MainActivity.MINIMUM_CONFIDENCE // sets minimum confidence levels for detection
+            val minConfidence = ModelUtils.MINIMUM_CONFIDENCE // sets minimum confidence levels for detection
 
             var mappedPredictions: MutableList<Detection> = mutableListOf()    // create a list for detection map
 
@@ -255,7 +254,7 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                 //Log.d("DETECTION",result.detectedClass.toString())
 
                 // if location is not null and the detection confidence is over threshold, then...
-                if (location != null && result.confidence >= minConfidence) {
+                if (result.confidence >= minConfidence) {
                     //canvas1.drawRect(location, paint)           // draw on canvas1 for the location of detected object
                    // cropToFrameMat.mapRect(location)            // add location rects to cropToFrameMat
                     //result.location = location
@@ -391,8 +390,6 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                         //Log.d("TRICYCLE", "Detection is a Tricycle")
                         //Skip everything below if isTricycle
                         continue
-                    }else{
-                        //Log.d("TRICYCLE", "Detection is not a tricycle")
                     }
                     for(helmet in helmetList){
                         // Check if helmet is within upper 1/3 of motorcycle rect. Image is in landscape
@@ -427,12 +424,11 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                         var pointX = 0
                         if(motorcycle.licensePlate != null)
                             pointX = (motorcycle.licensePlate!!.detectedLicense.location.left.toInt() + (motorcycle.licensePlate!!.detectedLicense.location.width().toInt() / 2))
-                        else{
+                         else{
                             pointX = (motorcycle.motorcyclist!!.location.left.toInt() + (motorcycle.motorcyclist!!.location.width().toInt() / 2))
                         }
                         val pointY = -motorcycle.motorcyclist!!.location.bottom.toInt()
                         val pointOfReference = Point(pointX, pointY)
-                        Log.d("COUNTERFLOW_LP", "$pointX, $pointY")
 
                         // Check if this point is within the path
 
@@ -444,17 +440,17 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
 
                         val a = Point(laneResults[index][2].toInt(), -laneResults[index][3].toInt())
                         val b = Point(laneResults[index][0].toInt(), -laneResults[index][1].toInt())
-                        Log.d("COUNTERFLOW_LANE", "(${b.x}, ${b.y}) , (${a.x}, ${a.y})")
+//                        Log.d("COUNTERFLOW_LANE", "(${b.x}, ${b.y}) , (${a.x}, ${a.y})")
                         val determinant = (b.y - a.y)*(pointOfReference.x - a.x) - (b.x - a.x)*(pointOfReference.y - a.y)
                         Log.d("Determinant", "$determinant")
-                        if(determinant == 0){
-                            Log.d("COUNTERFLOW_DET", "Point is on line")
-                        }else if(determinant > 0){
-                            Log.d("COUNTERFLOW_DET", "COUNTERFLOWING DETECTED")
+                        if(determinant > 0){
+                            // counterflow detected
+                            motorcycle.offenseCounterflow = "yes"
                         }
                     }
+
                     /**
-                     * Check current potential violations list. If there is any, process the violations list.
+                       * Check current potential violations list. If there is any, process the violations list.
                      */
                     val originalPotentialViolationsList = liveModel.getPotentialViolationsList() // Get potential list
                     var refTime = FileUtil.getDateTime()
@@ -463,25 +459,26 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                         for(motorcycle in motorcycleList){
                             // check if lp of potential violator exists within detected motorcycle objects
                             // IF THIS IS TRUE, THEN CONFIRM THE VIOLATION.
-                            if(potViolator.potentialViolation
-                                && (potViolator.motorcyclist!!.location.contains(motorcycle.licensePlate!!.detectedLicense.location)
-                                        || potViolator.licensePlate!!.licenseNumber.equals(motorcycle.licensePlate!!.licenseNumber, true) )) {
-
-                                // If previous violator is still in this frame,
-                                // after 2 seconds, process it to final violation. Checking involves
-                                // looking at the relative locations of the LP or a License Number match
-                                // and checking if they have the same data
-                                motorcycle.potentialViolation = true        // motorcycle has been found in pot vio list
-                                if((FileUtil.elapsedTime(FileUtil.stringToDate(potViolator.dateTime), refTime) >= 2.0)){
-                                    // Remove from potential violations list
-                                    liveModel.removeFromPotentialViolationsList(potViolator)
-                                    // Call and prepare to save data in device or send over the network
-                                    motorcycle.potentialViolation = false
-                                    motorcycle.finalViolation = true
-                                    processViolation(potViolator)
-                                    potAddedToFinal = true
-                                    break
-                                }   // else do nothing
+                            if(potViolator.potentialViolation){
+                               if((potViolator.motorcyclist!!.location.contains(motorcycle.licensePlate!!.detectedLicense.location)
+                                            || potViolator.licensePlate!!.licenseNumber.equals(motorcycle.licensePlate!!.licenseNumber, true)
+                                            || ModelUtils.box_iou(potViolator.motorcyclist!!.location, motorcycle.motorcyclist!!.location) < 0.9)) {
+                                   // If previous violator is still in this frame,
+                                   // after 2 seconds, process it to final violation. Checking involves
+                                   // looking at the relative locations of the motorcyclist, LP or a License Number match
+                                   // and checking if they have the same data
+                                   motorcycle.potentialViolation = true        // motorcycle has been found in pot vio list
+                                       if ((FileUtil.elapsedTime(FileUtil.stringToDate(potViolator.dateTime), refTime) >= 2.0)) {
+                                           // Remove from potential violations list
+                                           liveModel.removeFromPotentialViolationsList(potViolator)
+                                           // Call and prepare to save data in device
+                                           motorcycle.potentialViolation = false
+                                           motorcycle.finalViolation = true
+                                           processViolation(potViolator)
+                                           potAddedToFinal = true
+                                           break
+                                   }
+                               }
                             }
                         }
                         // If none of the current lps' intersect with a previous potential violator, remove it from
@@ -495,14 +492,18 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                     }
                     /**
                      * Place motorcycle into potential violation if non-existent yet. Next Frame, check if existing license plate is within potential
-                     * violation list.
+                     * violation list. (Code above)
                      * NO HELMET DETECTION
                      */
 
-                    if(motorcycle.helmet == null && !motorcycle.potentialViolation && !motorcycle.finalViolation){
-                        //Log.d("MOTOR_DETECTED", "HELMET NOT FOUND, PLACING IN POTENTIAL")
+                    if(!motorcycle.potentialViolation && !motorcycle.finalViolation){
+
                         motorcycle.potentialViolation = true
-                        motorcycle.offense = "no helmet"
+                        if(motorcycle.helmet == null){
+                            //Log.d("MOTOR_DETECTED", "HELMET NOT FOUND, PLACING IN POTENTIAL")
+                            motorcycle.offenseHelmet = "yes"
+                        }
+                        // Add to potential Violations List
                         liveModel.addToPotentialViolationsList(motorcycle)
                     }
                 }
@@ -599,7 +600,8 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
         var licensePlate: LicensePlate? = null
         var potentialViolation: Boolean = false
         var finalViolation: Boolean = false
-        var offense: String = ""
+        var offenseHelmet: String = "no"
+        var offenseCounterflow: String = "no"
         var dateTime: String = ""
     }
 

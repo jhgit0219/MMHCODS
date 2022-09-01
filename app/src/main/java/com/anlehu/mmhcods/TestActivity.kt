@@ -19,10 +19,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
-import com.anlehu.mmhcods.utils.BorderedText
-import com.anlehu.mmhcods.utils.Detector
-import com.anlehu.mmhcods.utils.FileUtil
-import com.anlehu.mmhcods.utils.ImageUtils
+import com.anlehu.mmhcods.utils.*
 import com.anlehu.mmhcods.views.OverlayView
 import java.io.File
 import java.util.*
@@ -152,7 +149,7 @@ class TestActivity : AppCompatActivity() {
 //            paint.style = Paint.Style.STROKE
 //            paint.strokeWidth = 2.0f
 
-            val minConfidence = MainActivity.MINIMUM_CONFIDENCE // sets minimum confidence levels
+            val minConfidence = ModelUtils.MINIMUM_CONFIDENCE // sets minimum confidence levels
                                                                 // for detection
 
             // create a list for detection map

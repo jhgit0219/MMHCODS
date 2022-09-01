@@ -295,7 +295,7 @@ open class LaneClassifier()  : Detector {
     }
 
     override fun getObjThresh(): Float {
-        return MainActivity.MINIMUM_CONFIDENCE
+        return ModelUtils.MINIMUM_CONFIDENCE
     }
 
 

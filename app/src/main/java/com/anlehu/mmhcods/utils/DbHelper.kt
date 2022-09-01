@@ -12,7 +12,8 @@ class DbHelper(context: Context): SQLiteOpenHelper(context, DATABASE_NAME, null,
         const val COL_TIMESTAMP = "timestamp"
         const val COL_LOC = "location"
         const val COL_SNAPSHOT = "snapshot"
-        const val COL_OFFENSE = "offense"
+        const val COL_HELMET = "no_helmet"
+        const val COL_COUNTERFLOW = "counterflow"
         const val COL_LP = "license_plate"
     }
 
@@ -36,7 +37,8 @@ class DbHelper(context: Context): SQLiteOpenHelper(context, DATABASE_NAME, null,
                     "${ViolationEntry.COL_TIMESTAMP} TEXT,"+
                     "${ViolationEntry.COL_LOC} TEXT,"+
                     "${ViolationEntry.COL_SNAPSHOT} TEXT,"+
-                    "${ViolationEntry.COL_OFFENSE} TEXT,"+
+                    "${ViolationEntry.COL_HELMET} TEXT,"+
+                    "${ViolationEntry.COL_COUNTERFLOW} TEXT,"+
                     "${ViolationEntry.COL_LP} TEXT)"
 
         private const val SQL_DELETE_ENTRIES = "DROP TABLE IF EXISTS ${ViolationEntry.TABLE_NAME}"
