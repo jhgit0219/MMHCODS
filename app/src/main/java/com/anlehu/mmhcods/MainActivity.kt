@@ -44,16 +44,13 @@ class MainActivity : AppCompatActivity() {
 
         testButton = findViewById(R.id.test_button)
         testButton.setOnClickListener{
-            startActivity(
-                Intent(
-                    this@MainActivity,
-                    TestActivity::class.java
-                ).putExtra("mountedPath", mountedPath)
-            )
+            val intent = Intent(this@MainActivity, TestActivity::class.java)
+            intent.putExtra("path", mountedPath)
+            startActivity(intent)
         }
 
         val activityManager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
-        val configurationInfo = activityManager.deviceConfigurationInfo
+//        val configurationInfo = activityManager.deviceConfigurationInfo
 
 //        System.err.println(configurationInfo.glEsVersion.toDouble())
 //        System.err.println(configurationInfo.reqGlEsVersion >= 0x30000)

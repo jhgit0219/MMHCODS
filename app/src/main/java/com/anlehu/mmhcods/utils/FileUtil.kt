@@ -31,8 +31,12 @@ class FileUtil {
             return LocalDateTime.parse(str, format)
         }
 
-        fun DateToString(time: LocalDateTime): String{
+        fun dateToString(time: LocalDateTime): String{
             return time.format(format)
+        }
+
+        fun dateToString(customFormat : DateTimeFormatter): String{
+            return getDateTime().format(customFormat)
         }
 
 

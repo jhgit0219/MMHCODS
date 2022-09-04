@@ -13,6 +13,15 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_bias="0.5
-" />
+        app:layout_constraintVertical_bias="0.5"/>
+
+    <com.anlehu.mmhcods.views.OverlayView
+        android:id="@+id/tracking_overlay"
+        android:layout_width="1920px"
+        android:layout_height="1080px"
+        android:layout_gravity="center"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 </androidx.constraintlayout.widget.ConstraintLayout>

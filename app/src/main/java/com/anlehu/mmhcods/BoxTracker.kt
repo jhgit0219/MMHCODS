@@ -120,9 +120,9 @@ class BoxTracker {
                     canvas, trackedPos.left + cornerSize, trackedPos.top, "$labelString%", boxPaint
                 )
             }
-
         }
         //canvas.drawLines(lanePoints, boxPaint)
+
     }
 
     @Synchronized

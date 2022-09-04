@@ -234,11 +234,11 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
             //TODO: Make Lane Detector like how the YoloV5 works
             val laneResults  = laneDetector.detectImage(laneBitmap!!)
             copiedBitmap = Bitmap.createBitmap(croppedBitmap!!)
-            val canvas1 = Canvas(copiedBitmap!!)
-            val paint = Paint()
-            paint.color = Color.BLUE
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = 2.0f
+//            val canvas1 = Canvas(copiedBitmap!!)
+//            val paint = Paint()
+//            paint.color = Color.BLUE
+//            paint.style = Paint.Style.STROKE
+//            paint.strokeWidth = 2.0f
 
             val minConfidence = ModelUtils.MINIMUM_CONFIDENCE // sets minimum confidence levels for detection
 
@@ -346,7 +346,7 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                         val motorcycleObject = MotorcycleObject()
                         result.id = index++.toString()                              // increment index identifier
                         motorcycleObject.motorcyclist = result                      // set the motorcyclist object
-                        motorcycleObject.dateTime = FileUtil.DateToString(FileUtil.getDateTime())          // set datetime of violation
+                        motorcycleObject.dateTime = FileUtil.dateToString(FileUtil.getDateTime())          // set datetime of violation
                         motorcycleList.add(motorcycleObject)                        // add moto object to list
                         //Log.d("MOTOR_DETECTED:", motorcycleList.size.toString())
                     }
@@ -540,7 +540,7 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
          * Process the final violations list. Save it into device, preparing for upload
          */
 
-        private fun processViolation(potViolator: DetectorActivity.MotorcycleObject) {
+        fun processViolation(potViolator: DetectorActivity.MotorcycleObject) {
 
             Runnable{
                 //readLp(potViolator) redundant?

@@ -76,7 +76,7 @@ class ImageUtils {
          * Saves image to device
          ********************************************************************************************************/
         fun saveBitmap(bitmap: Bitmap, filename: String) {
-            val root = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM).absolutePath
+            val root = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM).absolutePath+"/dataset"
             Log.i("Saving bitmap to", "${bitmap.width}, ${bitmap.height}, $root, as $filename")
             val myDir = File(root)
             if (!myDir.mkdirs()) {
