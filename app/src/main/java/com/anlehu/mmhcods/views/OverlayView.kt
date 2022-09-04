@@ -3,7 +3,6 @@ package com.anlehu.mmhcods.views
 import android.content.Context
 import android.graphics.Canvas
 import android.util.AttributeSet
-import android.util.Log
 import android.view.View
 import java.util.*
 
@@ -18,7 +17,6 @@ class OverlayView: View {
             callback.drawCallback(canvas!!)
         }
         super.draw(canvas)
-        Log.d("OVERLAY SIZE", "$width x $height")
     }
     interface DrawCallback{
         fun drawCallback(canvas: Canvas)

@@ -53,7 +53,6 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
     private var MAINTAIN_ASPECT = true
 
     private val dbHelper = DbHelper(this)
-    private lateinit var db: SQLiteDatabase
 
     var mountedPath = ""
 
@@ -116,7 +115,7 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                 put(ViolationEntry.COL_LP, if(violation.licensePlate != null) violation.licensePlate!!.licenseNumber else "")
             }
             val newRowId = db.insert(ViolationEntry.TABLE_NAME, null, values)
-            //Log.d("DATABASE_OP", "Inserted $newRowId")
+            Log.d("DATABASE_OP", "Inserted $newRowId")
             liveModel.removeFromFinalViolationsList(violation)
         }
     }
@@ -216,7 +215,7 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
 
         // draw on canvas through matrix using rgbFrameBitmap as data values, which will be drawn on croppedBitmap
         //canvas.drawBitmap(rgbFrameBitmap!!, frameToCropMat, null)
-        ImageUtils.saveBitmap(croppedBitmap!!, "supposed")
+//        ImageUtils.saveBitmap(croppedBitmap!!, "supposed")
 
         //ImageUtils.saveBitmap(rgbFrameBitmap!!, "preview.png")
 
@@ -297,6 +296,8 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
      * singleton tied to detector activity
      ********************************************************************************************************/
     companion object{
+
+        lateinit var db: SQLiteDatabase
 
         val outputRangeX = floatArrayOf(0f, 1920f)
         val outputRangeY = floatArrayOf(0f, 1080f)
@@ -442,8 +443,9 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                         val b = Point(laneResults[index][0].toInt(), -laneResults[index][1].toInt())
 //                        Log.d("COUNTERFLOW_LANE", "(${b.x}, ${b.y}) , (${a.x}, ${a.y})")
                         val determinant = (b.y - a.y)*(pointOfReference.x - a.x) - (b.x - a.x)*(pointOfReference.y - a.y)
-                        Log.d("Determinant", "$determinant")
+
                         if(determinant > 0){
+                            Log.d("PROC_VIOL", "COUNTERFLOW, PLACING IN POTENTIAL")
                             // counterflow detected
                             motorcycle.offenseCounterflow = "yes"
                         }
@@ -452,58 +454,80 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
                     /**
                        * Check current potential violations list. If there is any, process the violations list.
                      */
-                    val originalPotentialViolationsList = liveModel.getPotentialViolationsList() // Get potential list
-                    var refTime = FileUtil.getDateTime()
-                    for(potViolator in originalPotentialViolationsList!!){                      // check every pot vio
-                        var potAddedToFinal = false
-                        for(motorcycle in motorcycleList){
-                            // check if lp of potential violator exists within detected motorcycle objects
-                            // IF THIS IS TRUE, THEN CONFIRM THE VIOLATION.
-                            if(potViolator.potentialViolation){
-                               if((potViolator.motorcyclist!!.location.contains(motorcycle.licensePlate!!.detectedLicense.location)
+                    try{
+                        val originalPotentialViolationsList = liveModel.getPotentialViolationsList() // Get potential list
+                        var refTime = FileUtil.getDateTime()
+                        for(potViolator in originalPotentialViolationsList!!){                      // check every pot vio
+                            var potAddedToFinal = false
+                            for(motorcycle in motorcycleList){
+                                // check if lp of potential violator exists within detected motorcycle objects
+                                // IF THIS IS TRUE, THEN CONFIRM THE VIOLATION.
+                                if(potViolator.potentialViolation){
+                                    Log.d("TEST", "Succeed start")
+                                    if(potViolator.licensePlate != null){
+                                        if(potViolator.motorcyclist!!.location.contains(motorcycle.licensePlate!!.detectedLicense.location)
                                             || potViolator.licensePlate!!.licenseNumber.equals(motorcycle.licensePlate!!.licenseNumber, true)
-                                            || ModelUtils.box_iou(potViolator.motorcyclist!!.location, motorcycle.motorcyclist!!.location) < 0.9)) {
-                                   // If previous violator is still in this frame,
-                                   // after 2 seconds, process it to final violation. Checking involves
-                                   // looking at the relative locations of the motorcyclist, LP or a License Number match
-                                   // and checking if they have the same data
-                                   motorcycle.potentialViolation = true        // motorcycle has been found in pot vio list
-                                       if ((FileUtil.elapsedTime(FileUtil.stringToDate(potViolator.dateTime), refTime) >= 2.0)) {
-                                           // Remove from potential violations list
-                                           liveModel.removeFromPotentialViolationsList(potViolator)
-                                           // Call and prepare to save data in device
-                                           motorcycle.potentialViolation = false
-                                           motorcycle.finalViolation = true
-                                           processViolation(potViolator)
-                                           potAddedToFinal = true
-                                           break
-                                   }
-                               }
+                                        ) {
+                                            // If previous violator is still in this frame,
+                                            // after 2 seconds, process it to final violation. Checking involves
+                                            // looking at the relative locations of the motorcyclist, LP or a License Number match
+                                            // and checking if they have the same data
+                                            motorcycle.potentialViolation = true        // motorcycle has been found in pot vio list
+                                            if ((FileUtil.elapsedTime(FileUtil.stringToDate(potViolator.dateTime), refTime) >= 2.0)) {
+                                                // Remove from potential violations list
+                                                Log.d("TEST", "Succeed end")
+                                                liveModel.removeFromPotentialViolationsList(potViolator)
+                                                // Call and prepare to save data in device
+                                                motorcycle.potentialViolation = false
+                                                motorcycle.finalViolation = true
+                                                processViolation(potViolator)
+                                                potAddedToFinal = true
+                                                break
+                                            }
+                                        }
+                                    }else if((ModelUtils.box_iou(potViolator.motorcyclist!!.location, motorcycle.motorcyclist!!.location) < 0.9)){
+                                        motorcycle.potentialViolation = true        // motorcycle has been found in pot vio list
+                                        if ((FileUtil.elapsedTime(FileUtil.stringToDate(potViolator.dateTime), refTime) >= 2.0)) {
+                                            // Remove from potential violations list
+                                            Log.d("TEST", "nullSucceed end")
+                                            liveModel.removeFromPotentialViolationsList(potViolator)
+                                            // Call and prepare to save data in device
+                                            motorcycle.potentialViolation = false
+                                            motorcycle.finalViolation = true
+                                            processViolation(potViolator)
+                                            potAddedToFinal = true
+                                            break
+                                        }
+                                    }
+                                }
+
+                            }
+                            // If none of the current lps' intersect with a previous potential violator, remove it from
+                            // The list if enough time has elapsed.
+                            if(!potAddedToFinal){
+                                if((FileUtil.elapsedTime(FileUtil.stringToDate(potViolator.dateTime), refTime) >= 2.0)){
+                                    liveModel.removeFromPotentialViolationsList(potViolator)
+                                    //Log.d("NO_VIOL", "No violators detected within current frame")
+                                }
                             }
                         }
-                        // If none of the current lps' intersect with a previous potential violator, remove it from
-                        // The list if enough time has elapsed.
-                        if(!potAddedToFinal){
-                            if((FileUtil.elapsedTime(FileUtil.stringToDate(potViolator.dateTime), refTime) >= 2.0)){
-                                liveModel.removeFromPotentialViolationsList(potViolator)
-                                //Log.d("NO_VIOL", "No violators detected within current frame")
-                            }
-                        }
+                    }catch(e: Exception){
+                        e.printStackTrace()
                     }
                     /**
                      * Place motorcycle into potential violation if non-existent yet. Next Frame, check if existing license plate is within potential
                      * violation list. (Code above)
-                     * NO HELMET DETECTION
                      */
 
                     if(!motorcycle.potentialViolation && !motorcycle.finalViolation){
 
                         motorcycle.potentialViolation = true
                         if(motorcycle.helmet == null){
-                            //Log.d("MOTOR_DETECTED", "HELMET NOT FOUND, PLACING IN POTENTIAL")
+                            Log.d("PROC_VIOL", "HELMET NOT FOUND, PLACING IN POTENTIAL")
                             motorcycle.offenseHelmet = "yes"
                         }
                         // Add to potential Violations List
+                        Log.d("PROC_VIOL", "Adding to potential Violations List")
                         liveModel.addToPotentialViolationsList(motorcycle)
                     }
                 }
@@ -517,26 +541,39 @@ open class DetectorActivity: CameraActivity(), ImageReader.OnImageAvailableListe
          */
 
         private fun processViolation(potViolator: DetectorActivity.MotorcycleObject) {
-            if(potViolator.licensePlate != null){
-                Runnable{
-                    //readLp(potViolator) redundant?
-                    if(!liveModel.getReportedList()!!.contains(potViolator.licensePlate!!.licenseNumber)){
+
+            Runnable{
+                //readLp(potViolator) redundant?
+                if(potViolator.licensePlate != null){
+                    if(potViolator.licensePlate!!.licenseNumber.isNotBlank() &&
+                        !liveModel.getReportedList()!!.contains(potViolator.licensePlate!!.licenseNumber)){
                         //Log.d("PROC_VIOL", "ADDING LICENSE ${potViolator.licensePlate!!.licenseNumber}" )
                         liveModel.addToReportedList(potViolator.licensePlate!!.licenseNumber)
-                        potViolator.finalViolation = true
-                        liveModel.addToFinalViolationsList(potViolator)
-                    }else{
-                        //Log.d("PROC_VIOL", "LICENSE ALREADY PREPARED FOR REPORT" )
-                    }
-                }.run()
-                /**
-                 * 1.) SAVE DATA TO DEVICE. PREPARE TO UPLOAD OVER THE NETWORK
-                 * 1.) ADD CHECKER FOR NETWORK CONFIG. IF NETWORK WORKS
-                 */
-            }else{
-                //Log.d("PROC_VIOL", "No LP detected")
-            }
 
+                    }else{
+                        Log.d("PROC_VIOL", "LICENSE ALREADY PREPARED FOR REPORT" )
+                    }
+                    /**
+                     * 1.) SAVE DATA TO DEVICE. PREPARE TO UPLOAD OVER THE NETWORK
+                     * 1.) ADD CHECKER FOR NETWORK CONFIG. IF NETWORK WORKS
+                     */
+                    // to database
+                }
+                potViolator.finalViolation = true
+//                Log.d("TEST","Adding to FinalViolationsList")
+//                val values = ContentValues().apply{
+//                    put(ViolationEntry.COL_TIMESTAMP, Calendar.getInstance().time.toString())
+//                    put(ViolationEntry.COL_LOC, "Lapu-Lapu City")
+//                    put(ViolationEntry.COL_SNAPSHOT, "thislocation")
+//                    put(ViolationEntry.COL_HELMET, potViolator.offenseHelmet)
+//                    put(ViolationEntry.COL_COUNTERFLOW, potViolator.offenseCounterflow)
+//                    put(ViolationEntry.COL_LP, if(potViolator.licensePlate != null) potViolator.licensePlate!!.licenseNumber else "")
+//                }
+//                val newRowId = db.insert(ViolationEntry.TABLE_NAME, null, values)
+//                Log.d("DATABASE_OP", "Inserted $newRowId")
+                liveModel.addToFinalViolationsList(potViolator)
+
+            }.run()
         }
         /**
          * Checker for LP

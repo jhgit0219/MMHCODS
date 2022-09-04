@@ -36,7 +36,7 @@ class ImageUtils {
 
             if(rotation !=0 ){
                 if(rotation % 90 != 0){
-                    Log.w(Logger.DEF_TAG, "Rotation is not multiple of 90")
+                    //Log.w(Utils.DEF_TAG, "Rotation is not multiple of 90")
                 }
                 // Center of image at origin
                 matrix.postTranslate(-previewWidth / 2.0f, -previewHeight / 2.0f)
@@ -121,7 +121,7 @@ class ImageUtils {
             var fileName: String
 
             if(pad){
-                Log.d("RESIZING TO", "${size.width} x ${size.height}")
+                //Log.d("RESIZING TO", "${size.width} x ${size.height}")
                 if(inpBitmap == null){
                     var opt = BitmapFactory.Options()
                     opt.inPreferredConfig = Bitmap.Config.ARGB_8888
@@ -148,7 +148,7 @@ class ImageUtils {
                 val dstMat = Mat(size.height, size.width, CvType.CV_8UC4, Scalar(4.0))
 
                 Utils.bitmapToMat(bitmap, srcMat)
-                Log.d("MAT_SIZE", srcMat.cols().toString()+" oldWidth: $oldWidth oldHeight: $oldHeight ")
+                //Log.d("MAT_SIZE", srcMat.cols().toString()+" oldWidth: $oldWidth oldHeight: $oldHeight ")
                 Imgproc.resize(srcMat, dstMat, org.opencv.core.Size(), ratio, ratio, Imgproc.INTER_AREA)
 
                 val deltaW = size.width - newSize[0]
@@ -157,7 +157,7 @@ class ImageUtils {
                 val bottom = deltaH.toInt() - deltaH.toInt().floorDiv(2)
                 val left = deltaW.toInt().floorDiv(2)
                 val right = deltaW.toInt() - deltaW.toInt().floorDiv(2)
-                Log.d("MAKEBORDER", "top = $top | bottom = $bottom | left = $left | right = $right")
+                //Log.d("MAKEBORDER", "top = $top | bottom = $bottom | left = $left | right = $right")
 
                 Core.copyMakeBorder(dstMat, dstMat, top, bottom, left, right, Core.BORDER_CONSTANT, Scalar(0.0, 0.0, 0.0, 255.0))
                 bitmap = Bitmap.createBitmap(dstMat.width(), dstMat.height(), Bitmap.Config.ARGB_8888)
@@ -181,7 +181,6 @@ class ImageUtils {
             uvPixelStride: Int,
             rgbBytes: IntArray) {
 
-            Log.d("CONVERTING:", "$screenPreviewWidth x $screenPreviewHeight")
             var yPixel = 0
             for(i in 0 until screenPreviewHeight){
                 val pixelY = yRowStride * i

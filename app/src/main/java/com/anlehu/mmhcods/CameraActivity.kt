@@ -136,6 +136,14 @@ abstract class CameraActivity: AppCompatActivity(),
 
     @Synchronized
     override fun onStop() {
+        handlerThread!!.quitSafely()
+        try {
+            handlerThread!!.join()
+            handlerThread = null
+            handler = null
+        } catch (e: InterruptedException) {
+            Log.d("onPause", e.toString())
+        }
         super.onStop()
     }
 

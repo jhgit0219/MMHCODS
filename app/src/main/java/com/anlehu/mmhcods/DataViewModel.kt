@@ -1,10 +1,10 @@
 package com.anlehu.mmhcods
 
 import android.os.Build
+import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
-import java.util.*
 import java.util.concurrent.Semaphore
 
 class DataViewModel: ViewModel() {
@@ -60,6 +60,7 @@ class DataViewModel: ViewModel() {
             finLock.acquire()
             finalTempList = finalViolationsList.value!!
             finalTempList.add(motorcycleObject)
+            Log.d("ADD", "SUCCESS")
             finalViolationsList.postValue(finalTempList)
         }catch(e: Exception){
             e.printStackTrace()
@@ -74,6 +75,7 @@ class DataViewModel: ViewModel() {
             finLock.acquire()
             finalTempList = finalViolationsList.value!!
             finalTempList.removeIf{it == motorcycleObject}
+            Log.d("REMOVE", "SUCCESS")
             finalViolationsList.postValue(finalTempList)
         }catch(e: Exception){
             e.printStackTrace()
@@ -114,12 +116,12 @@ class DataViewModel: ViewModel() {
     fun getPotentialViolationsList(): MutableList<DetectorActivity.MotorcycleObject>? {
         var list: MutableList<DetectorActivity.MotorcycleObject> = ArrayList()
         try{
-            potLock.acquire()
+            //potLock.acquire()
              list = potentialViolationsList.value!!
         }catch(e: Exception){
             e.printStackTrace()
         }finally{
-            potLock.release()
+           // potLock.release()
         }
         return list
 
@@ -128,12 +130,12 @@ class DataViewModel: ViewModel() {
     fun getFinalViolationsList(): MutableList<DetectorActivity.MotorcycleObject>? {
         var list: MutableList<DetectorActivity.MotorcycleObject> = ArrayList()
         try{
-            finLock.acquire()
+            //finLock.acquire()
             list = finalViolationsList.value!!
         }catch(e: Exception){
             e.printStackTrace()
         }finally{
-            finLock.release()
+            //finLock.release()
         }
         return list
     }

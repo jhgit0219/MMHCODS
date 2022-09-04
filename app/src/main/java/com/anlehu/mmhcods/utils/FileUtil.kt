@@ -20,7 +20,7 @@ class FileUtil {
     companion object {
 
         private val PRIMARY_VOLUME_NAME = "primary"
-
+        @RequiresApi(Build.VERSION_CODES.O)
         private val format = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss")
 
         fun getDateTime(): LocalDateTime {
